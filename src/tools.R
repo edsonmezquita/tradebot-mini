@@ -1,10 +1,10 @@
 box::use(
-  ./searxng[ search ]
+  ./searxng[ search ],
+  ./alpaca[ market ],
+  lubridate
 )
 
-#' OpenAI-format tool schemas exposed to the model.
-#' @export
-TOOL_SEARCH <- list(list(
+TOOL_SEARCH <- list(
   type = "function",
   `function` = list(
     name = "search",
@@ -36,22 +36,78 @@ TOOL_SEARCH <- list(list(
       required = list("query")
     )
   )
-))
+)
 
-#' Handlers for the schemas above. Names must match `function$name`.
-#' Each handler takes one named-list arg (parsed JSON the model sent).
+TOOL_GET_BARS <- list(
+  type = "function",
+  `function` = list(
+    name = "get_bars",
+    description = paste(
+      "Fetch historical OHLCV bars for a single US stock ticker from Alpaca.",
+      "Returns a table with timestamp, open, high, low, close, volume, vwap.",
+      "Use after identifying tickers of interest from news to inspect price action."
+    ),
+    parameters = list(
+      type = "object",
+      properties = list(
+        symbol = list(
+          type = "string",
+          description = "Ticker symbol, e.g. 'AAPL'"
+        ),
+        days = list(
+          type = "integer",
+          description = "How many days of history to pull, ending today. Default 30."
+        ),
+        timeframe = list(
+          type = "string",
+          description = "Bar size, e.g. '1Day', '1Hour', '15Min'. Default '1Day'."
+        )
+      ),
+      required = list("symbol")
+    )
+  )
+)
+
+#' All tool schemas bundled for ask_with_tools().
+#' @export
+TOOLS <- list(TOOL_SEARCH, TOOL_GET_BARS)
+
+handle_search <- function(args) {
+  language <- args$language
+  if (is.null(language) || !nzchar(language)) language <- "all"
+  res <- search(
+    query = args$query,
+    engines = args$engines,
+    language = language,
+    pageno = 1
+  )
+  if (nrow(res) > 10) res <- res[seq_len(10)]
+  return(res)
+}
+
+handle_get_bars <- function(args) {
+  days <- if (is.null(args$days)) 30 else as.integer(args$days)
+  timeframe <- if (is.null(args$timeframe) || !nzchar(args$timeframe)) {
+    "1Day"
+  } else {
+    args$timeframe
+  }
+  now <- lubridate$now(tzone = "UTC")
+  then <- now - lubridate$ddays(days)
+  fmt <- function(t) format(t, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  bars <- market$get_bars(
+    symbol = args$symbol,
+    timeframe = timeframe,
+    start = fmt(then),
+    end = fmt(now),
+    feed = "iex"
+  )
+  return(bars)
+}
+
+#' Handlers bundled for ask_with_tools(). Names must match `function$name`.
 #' @export
 TOOL_HANDLERS <- list(
-  search = function(args) {
-    language <- args$language
-    if (is.null(language) || !nzchar(language)) language <- "all"
-    res <- search(
-      query = args$query,
-      engines = args$engines,
-      language = language,
-      pageno = 1
-    )
-    if (nrow(res) > 10) res <- res[seq_len(10)]
-    return(res)
-  }
+  search = handle_search,
+  get_bars = handle_get_bars
 )

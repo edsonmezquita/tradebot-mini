@@ -6,7 +6,7 @@ box::use(
   ./src/alpaca[market],
   ./src/deepseek[ ask, ask_with_tools ],
   ./src/prompts,
-  ./src/tools[ TOOL_SEARCH, TOOL_HANDLERS ]
+  ./src/tools[ TOOLS, TOOL_HANDLERS ]
 )
 
 iteration <- 0
@@ -27,14 +27,20 @@ setInterval(
     today <- format(lubridate$now(), "%Y-%m-%d")
     initial_query <- ask_with_tools(
       prompt = sprintf(
-        "Today is %s. Find current market-moving news and pick a few tickers worth watching today. Limit yourself to about 3 searches, then summarise.",
+        paste(
+          "Today is %s.",
+          "Step 1: do ~3 web searches to find current market-moving news.",
+          "Step 2: pick 3-5 stock tickers worth watching based on what you found.",
+          "Step 3: call get_bars for each ticker to inspect recent price action.",
+          "Step 4: summarise: which tickers look like good swing-trade setups and why."
+        ),
         today
       ),
       system = prompts$IDENTITY_TRADER,
-      tools = TOOL_SEARCH,
+      tools = TOOLS,
       handlers = TOOL_HANDLERS,
       max_tokens = 4000,
-      max_iter = 15,
+      max_iter = 20,
       verbose = TRUE
     )
 
