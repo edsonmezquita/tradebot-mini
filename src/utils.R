@@ -4,8 +4,8 @@ box::use(later, lubridate)
 setInterval <- function(fun, interval = 60) {
   handle <- later$later(
     function() {
-      fun()
       setInterval(fun, interval)
+      fun()
     },
     interval
   )
@@ -14,10 +14,11 @@ setInterval <- function(fun, interval = 60) {
 
 #' @export
 get_time_window <- function(window_size_d = lubridate$ddays(30)) {
-  now <- lubridate$now()
+  now <- lubridate$now(tzone = "UTC")
   then <- now - window_size_d
+  fmt <- function(t) format(t, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
   return(list(
-    then = then,
-    now = now
+    then = fmt(then),
+    now = fmt(now)
   ))
 }
