@@ -1,3 +1,5 @@
+box::use(later)
+
 #' @export
 setInterval <- function(fun, interval = 60) {
   handle <- later$later(

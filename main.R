@@ -8,14 +8,13 @@ setInterval(
   function() {
     news <- search(
       query = "Trump",
-      categories = "news,general",
       engines = "google,yandex,baidu",
       pageno = 1
     )
 
     print(news)
   },
-  60 * 60 * 24 * 7
+  10
 )
 
 while (!later$loop_empty()) {
