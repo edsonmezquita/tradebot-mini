@@ -130,7 +130,7 @@ run_pipeline <- function() {
       "(parameter choices encoded in the column names):\n",
       recent_text,
       "\n\nYour earlier justification for the indicator parameters:\n",
-      analysis$justification,
+      features_analysis$justification,
       "\n\nReply ONLY with JSON of the form:",
       '{ "decisions": [ { "ticker": "X", "action": "buy"|"sell"|"hold", "confidence": 0.0-1.0, "reason": "one sentence grounded in the table above" } ] }'
     ),
