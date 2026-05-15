@@ -16,7 +16,9 @@ setInterval <- function(fun, interval = 60) {
 get_time_window <- function(window_size_d = lubridate$ddays(30)) {
   now <- lubridate$now(tzone = "UTC")
   then <- now - window_size_d
-  fmt <- function(t) format(t, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  fmt <- function(t) {
+    return(format(t, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"))
+  }
   return(list(
     then = fmt(then),
     now = fmt(now)

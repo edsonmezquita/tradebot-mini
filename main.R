@@ -11,12 +11,15 @@ iteration <- 0
 setInterval(
   function() {
     time_window <- get_time_window()
-    cat(sprintf(
-      "Running iteration %i\n\tCURRENT WINDOW: %s to %s",
-      iteration,
-      time_window$then,
-      time_window$now
-    ), "\n")
+    cat(
+      sprintf(
+        "Running iteration %i\n\tCURRENT WINDOW: %s to %s",
+        iteration,
+        time_window$then,
+        time_window$now
+      ),
+      "\n"
+    )
 
     news <- search(
       query = "Trump",
