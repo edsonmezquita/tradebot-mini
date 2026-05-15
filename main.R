@@ -15,20 +15,20 @@ bars <- market$get_bars(
   end = time_window$now
 )
 
-setInterval(
-  function() {
-    print(get_time_window())
-    # news <- search(
-    #   query = "Trump",
-    #   engines = "google,yandex,baidu",
-    #   pageno = 1
-    # )
+# setInterval(
+#   function() {
+#     print(get_time_window())
+#     # news <- search(
+#     #   query = "Trump",
+#     #   engines = "google,yandex,baidu",
+#     #   pageno = 1
+#     # )
 
-    # print(news)
-  },
-  10
-)
+#     # print(news)
+#   },
+#   10
+# )
 
-while (!later$loop_empty()) {
-  later$run_now()
-}
+# while (!later$loop_empty()) {
+#   later$run_now()
+# }
