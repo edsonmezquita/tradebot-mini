@@ -96,7 +96,23 @@ TOOL_GET_BARS <- list(
 .feature_menu <- paste(
   vapply(
     names(FEATURE_REGISTRY),
-    function(n) sprintf("- %s: %s", n, FEATURE_REGISTRY[[n]]),
+    function(n) {
+      entry <- FEATURE_REGISTRY[[n]]
+      params <- entry$params
+      if (length(params) == 0L) {
+        param_str <- "(no params)"
+      } else {
+        param_str <- paste(
+          vapply(
+            names(params),
+            function(p) sprintf("%s=%s", p, paste(params[[p]], collapse = ",")),
+            character(1)
+          ),
+          collapse = ", "
+        )
+      }
+      sprintf("- %s [defaults: %s]: %s", n, param_str, entry$description)
+    },
     character(1)
   ),
   collapse = "\n"
@@ -110,8 +126,13 @@ TOOL_COMPUTE_FEATURES <- list(
     description = paste0(
       "Compute selected technical indicators from previously-fetched bars.\n",
       "REQUIRES a `bars_id` returned by an earlier get_bars_multi call.\n",
-      "Returns one row per symbol with the latest indicator values.\n\n",
-      "Available features:\n",
+      "Returns one row per symbol with the latest indicator values; output ",
+      "column names encode the parameters you chose ",
+      "(e.g. rsi_14, macd_hist_12_26_9, bb_pct_b_20_2, ema_cross_9_21).\n\n",
+      "You may pass the SAME indicator multiple times with different ",
+      "parameters to compare (e.g. rsi period=7 AND period=21).\n\n",
+      "Each feature is an OBJECT: { \"name\": \"<feature>\", ...params }.\n\n",
+      "Available features (defaults shown — override any of them):\n",
       .feature_menu
     ),
     parameters = list(
@@ -123,10 +144,35 @@ TOOL_COMPUTE_FEATURES <- list(
         ),
         features = list(
           type = "array",
-          description = "Subset of feature names from the menu above.",
+          description = paste(
+            "List of feature spec objects. Example:",
+            '[{"name":"rsi","period":14},',
+            '{"name":"rsi","period":21},',
+            '{"name":"macd","fast":12,"slow":26,"signal":9},',
+            '{"name":"ema","periods":[9,21,50]}]'
+          ),
           items = list(
-            type = "string",
-            enum = as.list(names(FEATURE_REGISTRY))
+            type = "object",
+            properties = list(
+              name = list(
+                type = "string",
+                description = "Indicator name from the menu.",
+                enum = as.list(names(FEATURE_REGISTRY))
+              ),
+              period     = list(type = "integer", description = "Lookback period (rsi/atr/bbands/supertrend)"),
+              sd         = list(type = "number",  description = "Std-dev multiplier (bbands)"),
+              fast       = list(type = "integer", description = "Fast period (macd)"),
+              slow       = list(type = "integer", description = "Slow period (macd)"),
+              signal     = list(type = "integer", description = "Signal smoothing period (macd)"),
+              multiplier = list(type = "number",  description = "ATR multiplier (supertrend)"),
+              periods    = list(
+                type = "array",
+                items = list(type = "integer"),
+                description = "List of EMA periods (ema). Multiple periods also yield ema_cross_<short>_<long> signals."
+              ),
+              window     = list(type = "integer", description = "Slope window (obv_slope)")
+            ),
+            required = list("name")
           )
         )
       ),
@@ -209,8 +255,9 @@ handle_compute_features <- function(args) {
     )
   }
   bars <- get(bars_id, envir = tools_state$bars)
-  features <- unlist(args$features, use.names = FALSE)
-  return(compute_features(bars = bars, features = features))
+  # `features` arrives as a list of named lists (one per feature spec),
+  # already parsed from JSON by ask_with_tools. Pass straight through.
+  return(compute_features(bars = bars, features = args$features))
 }
 
 #' Handlers bundled for ask_with_tools(). Names must match `function$name`.
