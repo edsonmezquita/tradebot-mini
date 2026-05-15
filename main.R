@@ -6,9 +6,16 @@ box::use(
 
 setInterval(
   function() {
-    print("Hello world!")
+    news <- search(
+      query = "Trump",
+      categories = "news,general",
+      engines = "google,yandex,baidu",
+      pageno = 1
+    )
+
+    print(news)
   },
-  3
+  60 * 60 * 24 * 7
 )
 
 while (!later$loop_empty()) {

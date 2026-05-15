@@ -13,7 +13,7 @@ general:
 
 server:
   # CHANGE THIS: openssl rand -hex 32
-  secret_key: "change-me-to-a-random-32-byte-hex-string"
+  secret_key: "super-secret-hard-coded-api-key"
   limiter: false # disable rate limiter for local API use
   image_proxy: false
   http_protocol_version: "1.1"
