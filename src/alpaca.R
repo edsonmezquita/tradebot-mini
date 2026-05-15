@@ -7,11 +7,12 @@ box::use(
   ]
 )
 
-ALPACA_API_ENDPOINT <- Sys.getenv("ALPACA_API_ENDPOINT")
 KEYS <- get_api_keys()
+ALPACA_DATA_ENDPOINT <- get_data_base_url()
+ALPACA_API_ENDPOINT <- get_base_url()
 
 market <- AlpacaMarketData$new(
   keys = KEYS,
-  base_url = TBASE,
-  data_base_url = DBASE
+  base_url = ALPACA_API_ENDPOINT,
+  data_base_url = ALPACA_DATA_ENDPOINT
 )

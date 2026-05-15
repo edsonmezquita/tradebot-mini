@@ -1,18 +1,30 @@
 box::use(
   later,
-  ./src/utils[ setInterval ],
-  ./src/searxng[search]
+  ./src/utils[setInterval, get_time_window],
+  ./src/searxng[search],
+  ./src/alpaca[market]
+)
+
+
+time_window <- get_time_window()
+
+bars <- market$get_bars(
+  symbol = "AAPL",
+  timeframe = "1Day",
+  start = time_window$then,
+  end = time_window$now
 )
 
 setInterval(
   function() {
-    news <- search(
-      query = "Trump",
-      engines = "google,yandex,baidu",
-      pageno = 1
-    )
+    print(get_time_window())
+    # news <- search(
+    #   query = "Trump",
+    #   engines = "google,yandex,baidu",
+    #   pageno = 1
+    # )
 
-    print(news)
+    # print(news)
   },
   10
 )
