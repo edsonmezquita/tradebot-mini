@@ -3,7 +3,8 @@ box::use(
   ./src/utils[setInterval, get_time_window],
   ./src/searxng[search],
   ./src/alpaca[market],
-  ./src/deepseek[ ask, ask_with_tools ]
+  ./src/deepseek[ ask, ask_with_tools ],
+  ./src/prompts
 )
 
 iteration <- 0
@@ -20,6 +21,8 @@ setInterval(
       ),
       "\n"
     )
+
+    initial_query <- ask_with_tools(prompts$IDENTITY_TRADER)
 
     news <- search(
       query = "Trump",
