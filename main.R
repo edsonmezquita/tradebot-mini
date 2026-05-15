@@ -1,14 +1,19 @@
 box::use(
   later,
   jsonlite[ fromJSON ],
-  data.table[ tail ],
+  utils[ tail ],
   utils[ capture.output ],
   ./src/utils[ setInterval, get_time_window ],
   ./src/deepseek[ ask, ask_with_tools ],
   ./src/prompts,
-  ./src/tools[ TOOL_SEARCH, TOOL_GET_BARS, TOOL_COMPUTE_FEATURES, TOOL_HANDLERS, tools_state ],
+  ./src/tools[
+    TOOL_SEARCH, TOOL_GET_BARS, TOOL_COMPUTE_FEATURES,
+    TOOL_HANDLERS, tools_state
+  ],
   ./src/features[ format_feature_menu ],
-  ./src/signals[ derive_signals ]
+  ./src/signals[ derive_signals ],
+  ./src/alpaca[ market ],
+  ./src/universe[ validate_picks ]
 )
 
 iteration <- 0
@@ -17,8 +22,9 @@ setInterval(
   function() {
     time_window <- get_time_window()
     cat(sprintf(
-      "\n========== iteration %i  %s ==========\n",
+      "\n========== iteration %i  %s - %s ==========\n",
       iteration,
+      time_window$then,
       time_window$now
     ))
 
@@ -30,7 +36,10 @@ setInterval(
           "Use the search tool (1-3 queries — you choose how many) to find current",
           "market-moving news. Then reply ONLY with JSON of the form:",
           '{ "picks": ["TICKER1","TICKER2",...], "rationale": "one paragraph: why these tickers, what news drives them" }',
-          "Pick 2-4 US-listed tickers. No prose outside the JSON."
+          "Pick 2-4 US-listed tickers. CONSTRAINTS: tickers MUST be common-stock symbols",
+          "tradable on Alpaca (NYSE / NASDAQ / ARCA / AMEX listings). No OTC, no foreign",
+          "ADRs that aren't US-listed, no crypto, no indices, no class-share aliases like",
+          "'BERKSHIRE' — use the actual exchange symbol (BRK.B). No prose outside the JSON."
         ),
         time_window$now
       ),
@@ -43,6 +52,15 @@ setInterval(
       verbose = TRUE
     )
     research <- fromJSON(research_response$content)
+
+    validation <- validate_picks(research$picks)
+    if (length(validation$invalid) > 0) {
+      cat("  dropped invalid picks:", paste(validation$invalid, collapse = ", "), "\n")
+    }
+    if (length(validation$valid) == 0) {
+      stop("All picks invalid against Alpaca tradable universe; aborting iteration.")
+    }
+    research$picks <- validation$valid
     cat("  picks:", paste(research$picks, collapse = ", "), "\n")
 
     cat("\n[stage 2] bars\n")
