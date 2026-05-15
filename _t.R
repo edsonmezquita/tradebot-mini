@@ -23,7 +23,7 @@ feats <- compute_features(
     list(name = "rsi", period = 14L),
     list(name = "rsi", period = 21L),
     list(name = "macd", fast = 5L, slow = 13L, signal = 5L),
-    list(name = "ema",  periods = c(9L, 21L, 50L))
+    list(name = "ema", periods = c(9L, 21L, 50L))
   )
 )
 print(feats)

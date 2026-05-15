@@ -37,8 +37,8 @@ feature_rsi <- function(bars, params) {
 }
 
 feature_macd <- function(bars, params) {
-  fast   <- as.integer(.arg(params, "fast",   12L))
-  slow   <- as.integer(.arg(params, "slow",   26L))
+  fast <- as.integer(.arg(params, "fast", 12L))
+  slow <- as.integer(.arg(params, "slow", 26L))
   signal <- as.integer(.arg(params, "signal", 9L))
   m <- hpfi$ind_mom_macd(bars$close, fast, slow, signal)
   tag <- .tag_join(fast, slow, signal)
@@ -50,7 +50,7 @@ feature_macd <- function(bars, params) {
 
 feature_bbands <- function(bars, params) {
   period <- as.integer(.arg(params, "period", 20L))
-  sd     <- as.numeric(.arg(params, "sd",     2.0))
+  sd <- as.numeric(.arg(params, "sd", 2.0))
   bb <- hpfi$ind_vol_bbands(bars$close, period, sd)
   tag <- .tag_join(period, sd)
   setNames(
@@ -68,8 +68,8 @@ feature_atr <- function(bars, params) {
 }
 
 feature_supertrend <- function(bars, params) {
-  period <- as.integer(.arg(params, "period",     10L))
-  mult   <- as.numeric(.arg(params, "multiplier", 3.0))
+  period <- as.integer(.arg(params, "period", 10L))
+  mult <- as.numeric(.arg(params, "multiplier", 3.0))
   st <- hpfi$ind_trend_supertrend(bars$high, bars$low, bars$close, period, mult)
   setNames(
     list(.last(st$direction)),
@@ -88,7 +88,7 @@ feature_ema <- function(bars, params) {
     sorted <- sort(periods)
     for (i in seq_len(length(sorted) - 1L)) {
       short_p <- sorted[i]
-      long_p  <- sorted[i + 1L]
+      long_p <- sorted[i + 1L]
       es <- .last(hpfi$ewm_ema(bars$close, short_p))
       el <- .last(hpfi$ewm_ema(bars$close, long_p))
       out[[paste0("ema_cross_", .tag(short_p), "_", .tag(long_p))]] <- if (is.na(es) || is.na(el)) {
@@ -121,17 +121,19 @@ feature_obv_slope <- function(bars, params) {
 feature_composite <- function(bars, params) {
   # Standard-parameter composite — intentionally not parameterised.
   rsi <- hpfi$ind_mom_rsi(bars$close, 14L)
-  bb  <- hpfi$ind_vol_bbands(bars$close, 20L, 2.0)
-  m   <- hpfi$ind_mom_macd(bars$close)
+  bb <- hpfi$ind_vol_bbands(bars$close, 20L, 2.0)
+  m <- hpfi$ind_mom_macd(bars$close)
   atr <- hpfi$ind_vol_atr(bars$high, bars$low, bars$close, 14L)
-  list(composite = mean(
-    c(
-      .last(hpfi$score_rsi(rsi)),
-      .last(hpfi$score_bb(bb$bb_pct_b)),
-      .last(hpfi$score_macd(m$histogram, atr))
-    ),
-    na.rm = TRUE
-  ))
+  list(
+    composite = mean(
+      c(
+        .last(hpfi$score_rsi(rsi)),
+        .last(hpfi$score_bb(bb$bb_pct_b)),
+        .last(hpfi$score_macd(m$histogram, atr))
+      ),
+      na.rm = TRUE
+    )
+  )
 }
 
 # ---- registry: name -> {description, defaults, fn} ------------------------
@@ -141,43 +143,43 @@ feature_composite <- function(bars, params) {
 FEATURE_REGISTRY <- list(
   rsi = list(
     description = "RSI momentum oscillator. >70 overbought, <30 oversold.",
-    params      = list(period = 14L),
-    fn          = feature_rsi
+    params = list(period = 14L),
+    fn = feature_rsi
   ),
   macd = list(
     description = "MACD trend/momentum. Returns macd, signal, hist columns.",
-    params      = list(fast = 12L, slow = 26L, signal = 9L),
-    fn          = feature_macd
+    params = list(fast = 12L, slow = 26L, signal = 9L),
+    fn = feature_macd
   ),
   bbands = list(
     description = "Bollinger Bands. Returns bb_pct_b (0-1 within band) and bb_bw (band width).",
-    params      = list(period = 20L, sd = 2.0),
-    fn          = feature_bbands
+    params = list(period = 20L, sd = 2.0),
+    fn = feature_bbands
   ),
   atr = list(
     description = "Average True Range volatility. Useful for stop sizing.",
-    params      = list(period = 14L),
-    fn          = feature_atr
+    params = list(period = 14L),
+    fn = feature_atr
   ),
   supertrend = list(
     description = "SuperTrend regime indicator. dir: 1 = uptrend, -1 = downtrend.",
-    params      = list(period = 10L, multiplier = 3.0),
-    fn          = feature_supertrend
+    params = list(period = 10L, multiplier = 3.0),
+    fn = feature_supertrend
   ),
   ema = list(
     description = "EMAs at one or more periods. Multiple periods also yield cross signals between consecutive lengths.",
-    params      = list(periods = c(20L, 50L)),
-    fn          = feature_ema
+    params = list(periods = c(20L, 50L)),
+    fn = feature_ema
   ),
   obv_slope = list(
     description = "Slope of On-Balance Volume over a recent window. Positive = accumulation.",
-    params      = list(window = 10L),
-    fn          = feature_obv_slope
+    params = list(window = 10L),
+    fn = feature_obv_slope
   ),
   composite = list(
     description = "Composite [-1,1] score blending RSI/BB/MACD scores at standard parameters.",
-    params      = list(),
-    fn          = feature_composite
+    params = list(),
+    fn = feature_composite
   )
 )
 
