@@ -164,6 +164,9 @@ ask_with_tools <- function(
       max_tokens = max_tokens,
       stream = FALSE
     )
+    if (isTRUE(json)) {
+      body$response_format <- list(type = "json_object")
+    }
     body <- body[!vapply(body, is.null, logical(1))]
 
     parsed <- .post(body, api_key, timeout)

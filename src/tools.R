@@ -111,7 +111,8 @@ TOOL_COMPUTE_FEATURES <- list(
       "Compute selected technical indicators from previously-fetched bars.\n",
       "REQUIRES a `bars_id` returned by an earlier get_bars_multi call.\n",
       "Returns one row per symbol with the latest indicator values.\n\n",
-      "Available features:\n", .feature_menu
+      "Available features:\n",
+      .feature_menu
     ),
     parameters = list(
       type = "object",
@@ -141,14 +142,18 @@ TOOLS <- list(TOOL_SEARCH, TOOL_GET_BARS, TOOL_COMPUTE_FEATURES)
 # ---- handlers --------------------------------------------------------------
 handle_search <- function(args) {
   language <- args$language
-  if (is.null(language) || !nzchar(language)) language <- "all"
+  if (is.null(language) || !nzchar(language)) {
+    language <- "all"
+  }
   res <- search(
     query = args$query,
     engines = args$engines,
     language = language,
     pageno = 1
   )
-  if (nrow(res) > 10) res <- res[seq_len(10)]
+  if (nrow(res) > 10) {
+    res <- res[seq_len(10)]
+  }
   return(res)
 }
 
@@ -165,23 +170,22 @@ handle_get_bars_multi <- function(args) {
   fmt <- function(t) format(t, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
 
   bars <- market$get_bars_multi(
-    symbols   = symbols,
+    symbols = symbols,
     timeframe = timeframe,
-    start     = fmt(then),
-    end       = fmt(now),
-    feed      = "iex"
+    start = fmt(then),
+    end = fmt(now),
+    feed = "iex"
   )
 
   bars_id <- .new_bars_id()
   assign(bars_id, bars, envir = tools_state$bars)
 
   # Compact summary returned to the model — not the full bars.
-  summary_per_symbol <- bars[
-    ,
+  summary_per_symbol <- bars[,
     list(
-      n_bars     = .N,
+      n_bars = .N,
       first_date = as.character(min(timestamp)),
-      last_date  = as.character(max(timestamp)),
+      last_date = as.character(max(timestamp)),
       last_close = close[.N]
     ),
     by = symbol
@@ -198,11 +202,13 @@ handle_compute_features <- function(args) {
   bars_id <- args$bars_id
   if (is.null(bars_id) || !exists(bars_id, envir = tools_state$bars)) {
     stop(
-      "Unknown bars_id '", bars_id, "'. ",
+      "Unknown bars_id '",
+      bars_id,
+      "'. ",
       "Call get_bars_multi first and pass its returned bars_id."
     )
   }
-  bars     <- get(bars_id, envir = tools_state$bars)
+  bars <- get(bars_id, envir = tools_state$bars)
   features <- unlist(args$features, use.names = FALSE)
   return(compute_features(bars = bars, features = features))
 }
@@ -210,7 +216,7 @@ handle_compute_features <- function(args) {
 #' Handlers bundled for ask_with_tools(). Names must match `function$name`.
 #' @export
 TOOL_HANDLERS <- list(
-  search           = handle_search,
-  get_bars_multi   = handle_get_bars_multi,
+  search = handle_search,
+  get_bars_multi = handle_get_bars_multi,
   compute_features = handle_compute_features
 )
