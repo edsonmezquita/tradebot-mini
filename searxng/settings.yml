@@ -1,0 +1,114 @@
+# SearXNG configuration for tradebot-mini
+# Docs: https://docs.searxng.org/admin/settings/
+
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: "tradebot-searxng"
+  privacypolicy_url: false
+  donation_url: false
+  contact_url: false
+  enable_metrics: false
+
+server:
+  # CHANGE THIS: openssl rand -hex 32
+  secret_key: "change-me-to-a-random-32-byte-hex-string"
+  limiter: false # disable rate limiter for local API use
+  image_proxy: false
+  http_protocol_version: "1.1"
+  method: "GET"
+  bind_address: "0.0.0.0"
+  port: 8080
+
+ui:
+  static_use_hash: true
+  default_locale: "en"
+  query_in_title: true
+  infinite_scroll: false
+  center_alignment: false
+  theme_args:
+    simple_style: auto
+
+search:
+  safe_search: 0                # 0 = none, 1 = moderate, 2 = strict
+  autocomplete: ""
+  default_lang: "all"
+  ban_time_on_fail: 5
+  max_ban_time_on_fail: 120
+  formats:
+    - html
+    - json                      # required for API access from R
+
+outgoing:
+  request_timeout: 6.0
+  max_request_timeout: 10.0
+  pool_connections: 100
+  pool_maxsize: 20
+  enable_http2: true
+
+# ---------------------------------------------------------------------------
+# Engines: enable a wide variety from different regions/jurisdictions
+# to reduce single-source bias. Override only what we want different from
+# the upstream defaults; everything else is inherited via use_default_settings.
+# ---------------------------------------------------------------------------
+engines:
+  # --- Western general web ---
+  - name: google
+    disabled: false
+  - name: bing
+    disabled: false
+  - name: duckduckgo
+    disabled: false
+  - name: brave
+    disabled: false
+  - name: mojeek
+    disabled: false
+  - name: qwant
+    disabled: false
+  - name: startpage
+    disabled: false
+
+  # --- Russian / Eastern European ---
+  - name: yandex
+    engine: yandex
+    shortcut: yd
+    disabled: false
+    categories: [general, web]
+
+  # --- Chinese ---
+  - name: baidu
+    engine: baidu
+    shortcut: bd
+    disabled: false
+    categories: [general, web]
+
+  # --- News (useful for trading sentiment) ---
+  - name: google news
+    disabled: false
+  - name: bing news
+    disabled: false
+  - name: duckduckgo news
+    disabled: false
+  - name: yahoo news
+    disabled: false
+  - name: reuters
+    disabled: false
+
+  # --- Reference / discussion ---
+  - name: wikipedia
+    disabled: false
+  - name: wikidata
+    disabled: false
+  - name: reddit
+    disabled: false
+  - name: hackernews
+    disabled: false
+  - name: stackoverflow
+    disabled: false
+
+categories_as_tabs:
+  general:
+  news:
+  it:
+  science:
