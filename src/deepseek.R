@@ -130,9 +130,12 @@ ask_with_tools <- function(
   verbose = FALSE
 ) {
   stopifnot(
-    nzchar(prompt), nzchar(api_key),
-    is.list(tools), length(tools) > 0,
-    is.list(handlers), !is.null(names(handlers))
+    nzchar(prompt),
+    nzchar(api_key),
+    is.list(tools),
+    length(tools) > 0,
+    is.list(handlers),
+    !is.null(names(handlers))
   )
 
   messages <- .build_messages(prompt, system)
@@ -178,16 +181,17 @@ ask_with_tools <- function(
       }
 
       if (verbose) {
-        cat(sprintf("[tool] %s(%s) -> %s\n",
-          name, raw_args,
-          toJSON(result, auto_unbox = TRUE)))
+        cat(sprintf("[tool] %s(%s) -> %s\n", name, raw_args, toJSON(result, auto_unbox = TRUE)))
       }
 
-      messages <- c(messages, list(list(
-        role = "tool",
-        tool_call_id = call$id,
-        content = toJSON(result, auto_unbox = TRUE)
-      )))
+      messages <- c(
+        messages,
+        list(list(
+          role = "tool",
+          tool_call_id = call$id,
+          content = toJSON(result, auto_unbox = TRUE)
+        ))
+      )
     }
   }
 

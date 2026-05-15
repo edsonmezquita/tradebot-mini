@@ -36,7 +36,6 @@ setInterval(
 
     d_stocks <- ask_with_tools(news + bars)
 
-
     market$buy(d_stocks$buy)
     market$sell(d_stocks$sell)
 
