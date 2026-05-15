@@ -41,18 +41,20 @@ TOOL_SEARCH <- list(
 TOOL_GET_BARS <- list(
   type = "function",
   `function` = list(
-    name = "get_bars",
+    name = "get_bars_multi",
     description = paste(
-      "Fetch historical OHLCV bars for a single US stock ticker from Alpaca.",
-      "Returns a table with timestamp, open, high, low, close, volume, vwap.",
+      "Fetch historical OHLCV bars for one or more US stock tickers from Alpaca.",
+      "Returns a table with symbol, timestamp, open, high, low, close, volume, vwap.",
+      "Pass multiple symbols in one call rather than calling repeatedly — it's much faster.",
       "Use after identifying tickers of interest from news to inspect price action."
     ),
     parameters = list(
       type = "object",
       properties = list(
-        symbol = list(
-          type = "string",
-          description = "Ticker symbol, e.g. 'AAPL'"
+        symbols = list(
+          type = "array",
+          description = "Ticker symbols, e.g. ['AAPL', 'MSFT', 'NVDA']",
+          items = list(type = "string")
         ),
         days = list(
           type = "integer",
@@ -63,7 +65,7 @@ TOOL_GET_BARS <- list(
           description = "Bar size, e.g. '1Day', '1Hour', '15Min'. Default '1Day'."
         )
       ),
-      required = list("symbol")
+      required = list("symbols")
     )
   )
 )
@@ -85,7 +87,8 @@ handle_search <- function(args) {
   return(res)
 }
 
-handle_get_bars <- function(args) {
+handle_get_bars_multi <- function(args) {
+  symbols <- unlist(args$symbols, use.names = FALSE)
   days <- if (is.null(args$days)) 30 else as.integer(args$days)
   timeframe <- if (is.null(args$timeframe) || !nzchar(args$timeframe)) {
     "1Day"
@@ -95,8 +98,8 @@ handle_get_bars <- function(args) {
   now <- lubridate$now(tzone = "UTC")
   then <- now - lubridate$ddays(days)
   fmt <- function(t) format(t, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
-  bars <- market$get_bars(
-    symbol = args$symbol,
+  bars <- market$get_bars_multi(
+    symbols = symbols,
     timeframe = timeframe,
     start = fmt(then),
     end = fmt(now),
@@ -109,5 +112,5 @@ handle_get_bars <- function(args) {
 #' @export
 TOOL_HANDLERS <- list(
   search = handle_search,
-  get_bars = handle_get_bars
+  get_bars_multi = handle_get_bars_multi
 )
