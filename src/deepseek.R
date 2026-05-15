@@ -44,6 +44,11 @@ box::use(
 #' @param max_tokens Cap on response length. V4 models are "thinking" models —
 #'   internal reasoning tokens count against this cap, so set it high enough
 #'   (>= a few hundred) or `content` may come back empty.
+#' @param json If TRUE, sets `response_format = {type: "json_object"}` so the
+#'   model is forced to return a single valid JSON document in `content`. Per
+#'   DeepSeek's docs you must also include the word "json" in your prompt and
+#'   ideally show an example of the desired shape, otherwise the call may
+#'   return an empty string.
 #' @param api_key DeepSeek API key. Defaults to env var DEEPSEEK_KEY.
 #' @param timeout Request timeout in seconds.
 #' @return The assistant's reply as a single string.
@@ -54,6 +59,7 @@ ask <- function(
   model = "deepseek-v4-pro",
   temperature = 0.7,
   max_tokens = NULL,
+  json = FALSE,
   api_key = Sys.getenv("DEEPSEEK_KEY"),
   timeout = 60
 ) {
@@ -66,6 +72,9 @@ ask <- function(
     max_tokens = max_tokens,
     stream = FALSE
   )
+  if (isTRUE(json)) {
+    body$response_format <- list(type = "json_object")
+  }
   body <- body[!vapply(body, is.null, logical(1))]
 
   parsed <- .post(body, api_key, timeout)
@@ -86,6 +95,10 @@ ask <- function(
 #'   arguments the model passed.
 #' @param system Optional system prompt.
 #' @param model,temperature,max_tokens,api_key,timeout See [ask()].
+#' @param json If TRUE, the FINAL assistant reply (after all tool calls finish)
+#'   must be valid JSON — sets `response_format = {type: "json_object"}`. As
+#'   with [ask()], include the word "json" and a shape example in your prompt.
+#'   Tool-call turns themselves are unaffected.
 #' @param max_iter Hard cap on tool-call round-trips. Local safety net — the
 #'   DeepSeek API itself imposes no limit (their sample uses `while True`).
 #'   Prevents runaway loops if a handler keeps erroring or the model keeps
@@ -124,6 +137,7 @@ ask_with_tools <- function(
   model = "deepseek-v4-pro",
   temperature = 0.7,
   max_tokens = NULL,
+  json = FALSE,
   api_key = Sys.getenv("DEEPSEEK_KEY"),
   timeout = 60,
   max_iter = 5,
