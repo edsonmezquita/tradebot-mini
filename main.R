@@ -1,10 +1,12 @@
 box::use(
+  lubridate,
   later,
   ./src/utils[setInterval, get_time_window],
   ./src/searxng[search],
   ./src/alpaca[market],
   ./src/deepseek[ ask, ask_with_tools ],
-  ./src/prompts
+  ./src/prompts,
+  ./src/tools[ TOOL_SEARCH, TOOL_HANDLERS ]
 )
 
 iteration <- 0
@@ -22,32 +24,38 @@ setInterval(
       "\n"
     )
 
-    initial_query <- ask_with_tools(prompts$IDENTITY_TRADER)
-
-    news <- search(
-      query = "Trump",
-      engines = "google,yandex,baidu",
-      pageno = 1
+    today <- format(lubridate$now(), "%Y-%m-%d")
+    initial_query <- ask_with_tools(
+      prompt = sprintf(
+        "Today is %s. Find current market-moving news and pick a few tickers worth watching today. Limit yourself to about 3 searches, then summarise.",
+        today
+      ),
+      system = prompts$IDENTITY_TRADER,
+      tools = TOOL_SEARCH,
+      handlers = TOOL_HANDLERS,
+      max_tokens = 4000,
+      max_iter = 15,
+      verbose = TRUE
     )
 
-    d_news <- ask_with_tools(news)
+    # d_news <- ask_with_tools(news)
 
-    bars <- market$get_bars(
-      symbol = d_news$stocks,
-      timeframe = "1Day",
-      start = time_window$then,
-      end = time_window$now,
-      feed = "iex"
-    )
+    # bars <- market$get_bars(
+    #   symbol = d_news$stocks,
+    #   timeframe = "1Day",
+    #   start = time_window$then,
+    #   end = time_window$now,
+    #   feed = "iex"
+    # )
 
-    d_stocks <- ask_with_tools(news + bars)
+    # d_stocks <- ask_with_tools(news + bars)
 
-    market$buy(d_stocks$buy)
-    market$sell(d_stocks$sell)
+    # market$buy(d_stocks$buy)
+    # market$sell(d_stocks$sell)
 
     iteration <<- iteration + 1
   },
-  60 * 60 * 3
+  10
 )
 
 while (!later$loop_empty()) {
