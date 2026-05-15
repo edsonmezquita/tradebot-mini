@@ -53,12 +53,15 @@ search <- function(
     ))
   }
 
-  return(rbindlist(lapply(body$results, function(r) {
-    list(
-      title = if (is.null(r$title)) NA_character_ else r$title,
-      url = if (is.null(r$url)) NA_character_ else r$url,
-      content = if (is.null(r$content)) NA_character_ else r$content,
-      engine = if (is.null(r$engine)) NA_character_ else r$engine
-    )
-  }), fill = TRUE))
+  return(rbindlist(
+    lapply(body$results, function(r) {
+      list(
+        title = if (is.null(r$title)) NA_character_ else r$title,
+        url = if (is.null(r$url)) NA_character_ else r$url,
+        content = if (is.null(r$content)) NA_character_ else r$content,
+        engine = if (is.null(r$engine)) NA_character_ else r$engine
+      )
+    }),
+    fill = TRUE
+  ))
 }
