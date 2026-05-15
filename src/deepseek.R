@@ -37,9 +37,9 @@ box::use(
 #'
 #' @param prompt User message (string).
 #' @param system Optional system prompt to steer the model.
-#' @param model DeepSeek model ID. Default "deepseek-v4-flash" — 1M context,
-#'   cheapest tier ($0.14/$0.28 per 1M tokens in/out). "deepseek-v4-pro" is
-#'   the higher-quality 1M-context option.
+#' @param model DeepSeek model ID. Default "deepseek-v4-pro" — 1M context,
+#'   higher-quality reasoning. "deepseek-v4-flash" is the cheaper 1M-context
+#'   option ($0.14/$0.28 vs $1.74/$3.48 per 1M tokens in/out).
 #' @param temperature Sampling temperature (0-2).
 #' @param max_tokens Cap on response length. V4 models are "thinking" models —
 #'   internal reasoning tokens count against this cap, so set it high enough
@@ -51,7 +51,7 @@ box::use(
 ask <- function(
   prompt,
   system = NULL,
-  model = "deepseek-v4-flash",
+  model = "deepseek-v4-pro",
   temperature = 0.7,
   max_tokens = NULL,
   api_key = Sys.getenv("DEEPSEEK_KEY"),
@@ -86,7 +86,10 @@ ask <- function(
 #'   arguments the model passed.
 #' @param system Optional system prompt.
 #' @param model,temperature,max_tokens,api_key,timeout See [ask()].
-#' @param max_iter Hard cap on tool-call iterations to prevent infinite loops.
+#' @param max_iter Hard cap on tool-call round-trips. Local safety net — the
+#'   DeepSeek API itself imposes no limit (their sample uses `while True`).
+#'   Prevents runaway loops if a handler keeps erroring or the model keeps
+#'   re-calling the same tool. Raise if you need deeper tool chains.
 #' @param verbose If TRUE, prints each tool call and result.
 #' @return List with `content` (final assistant text) and `messages` (full
 #'   conversation transcript including tool calls/results).
@@ -118,7 +121,7 @@ ask_with_tools <- function(
   tools,
   handlers,
   system = NULL,
-  model = "deepseek-v4-flash",
+  model = "deepseek-v4-pro",
   temperature = 0.7,
   max_tokens = NULL,
   api_key = Sys.getenv("DEEPSEEK_KEY"),
