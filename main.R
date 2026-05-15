@@ -1,6 +1,7 @@
 box::use(
   later,
-  ./src/utils[ setInterval ]
+  ./src/utils[ setInterval ],
+  ./src/searxng[search]
 )
 
 setInterval(
