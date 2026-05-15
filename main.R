@@ -14,15 +14,15 @@ box::use(
 iteration <- 0
 
 run_pipeline <- function() {
-  tw <- get_time_window()
+  time_window <- get_time_window()
   cat(sprintf(
     "\n========== iteration %i  %s ==========\n",
     iteration,
-    tw$now
+    time_window$now
   ))
 
   cat("\n[stage 1] research\n")
-  s1 <- ask_with_tools(
+  research_response <- ask_with_tools(
     prompt = sprintf(
       paste(
         "Today is %s.",
@@ -31,7 +31,7 @@ run_pipeline <- function() {
         '{ "picks": ["TICKER1","TICKER2",...], "rationale": "one paragraph: why these tickers, what news drives them" }',
         "Pick 2-4 US-listed tickers. No prose outside the JSON."
       ),
-      tw$now
+      time_window$now
     ),
     system = prompts$IDENTITY_TRADER,
     tools = list(TOOL_SEARCH),
@@ -41,11 +41,11 @@ run_pipeline <- function() {
     max_iter = 6,
     verbose = TRUE
   )
-  research <- fromJSON(s1$content)
+  research <- fromJSON(research_response$content)
   cat("  picks:", paste(research$picks, collapse = ", "), "\n")
 
   cat("\n[stage 2] bars\n")
-  s2 <- ask_with_tools(
+  bars_response <- ask_with_tools(
     prompt = sprintf(
       paste(
         "Picks from research: %s.",
@@ -71,7 +71,7 @@ run_pipeline <- function() {
     max_iter = 4,
     verbose = TRUE
   )
-  bars_meta <- fromJSON(s2$content)
+  bars_meta <- fromJSON(bars_response$content)
   cat(sprintf(
     "  bars_id=%s  timeframe=%s  days=%s\n",
     bars_meta$bars_id,
@@ -80,7 +80,7 @@ run_pipeline <- function() {
   ))
 
   cat("\n[stage 3] features (model picks specs via tool call; R does the math)\n")
-  s3 <- ask_with_tools(
+  features_response <- ask_with_tools(
     prompt = sprintf(
       paste(
         "Tickers: %s. Rationale: %s",
@@ -109,7 +109,7 @@ run_pipeline <- function() {
     max_iter = 4,
     verbose = TRUE
   )
-  analysis <- fromJSON(s3$content)
+  features_analysis <- fromJSON(features_response$content)
 
   bars <- tools_state$bars[[bars_meta$bars_id]]
   cat("  added cols:", paste(attr(bars, "feature_cols"), collapse = ", "), "\n")
@@ -122,7 +122,7 @@ run_pipeline <- function() {
   recent <- bars[, tail(.SD, 10L), by = symbol]
   recent_text <- paste(capture.output(print(recent)), collapse = "\n")
 
-  s4 <- ask(
+  decision_response <- ask(
     prompt = paste(
       "News rationale (from your earlier research):\n",
       research$rationale,
@@ -138,7 +138,7 @@ run_pipeline <- function() {
     json = TRUE,
     max_tokens = 4000
   )
-  decisions <- fromJSON(s4$content, simplifyDataFrame = TRUE)
+  decisions <- fromJSON(decision_response$content, simplifyDataFrame = TRUE)
   cat("\n--- model decisions ---\n")
   print(decisions$decisions)
 
