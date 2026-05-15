@@ -2,7 +2,8 @@ box::use(
   later,
   ./src/utils[setInterval, get_time_window],
   ./src/searxng[search],
-  ./src/alpaca[market]
+  ./src/alpaca[market],
+  ./src/deepseek[ ask, ask_with_tools ]
 )
 
 iteration <- 0
@@ -17,25 +18,31 @@ setInterval(
       time_window$now
     )
 
-    bars <- market$get_bars(
-      symbol = "AAPL",
-      timeframe = "1Day",
-      start = time_window$then,
-      end = time_window$now,
-      feed = "iex"
-    )
     news <- search(
       query = "Trump",
       engines = "google,yandex,baidu",
       pageno = 1
     )
 
-    # print(news)
-    print(bars)
+    d_news <- ask_with_tools(news)
+
+    bars <- market$get_bars(
+      symbol = d_news$stocks,
+      timeframe = "1Day",
+      start = time_window$then,
+      end = time_window$now,
+      feed = "iex"
+    )
+
+    d_stocks <- ask_with_tools(news + bars)
+
+
+    market$buy(d_stocks$buy)
+    market$sell(d_stocks$sell)
 
     iteration <<- iteration + 1
   },
-  3
+  60 * 60 * 6
 )
 
 while (!later$loop_empty()) {
