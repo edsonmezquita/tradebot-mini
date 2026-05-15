@@ -1,15 +1,14 @@
 box::use(
   later,
   jsonlite[ fromJSON ],
+  data.table[ tail ],
+  utils[ capture.output ],
   ./src/utils[ setInterval, get_time_window ],
   ./src/deepseek[ ask, ask_with_tools ],
   ./src/prompts,
-  ./src/tools[
-    TOOL_SEARCH,
-    TOOL_GET_BARS,
-    TOOL_COMPUTE_FEATURES,
-    TOOL_HANDLERS
-  ]
+  ./src/tools[ TOOL_SEARCH, TOOL_GET_BARS, TOOL_COMPUTE_FEATURES, TOOL_HANDLERS, tools_state ],
+  ./src/features[ format_feature_menu ],
+  ./src/signals[ derive_signals ]
 )
 
 iteration <- 0
@@ -22,14 +21,14 @@ run_pipeline <- function() {
     tw$now
   ))
 
-  cat("\n[stage 1] research — model picks tickers from news\n")
+  cat("\n[stage 1] research\n")
   s1 <- ask_with_tools(
     prompt = sprintf(
       paste(
         "Today is %s.",
         "Use the search tool (1-3 queries — you choose how many) to find current",
         "market-moving news. Then reply ONLY with JSON of the form:",
-        '{ "picks": ["TICKER1","TICKER2",...], "rationale": "one paragraph: why these tickers, what is the news driving them" }',
+        '{ "picks": ["TICKER1","TICKER2",...], "rationale": "one paragraph: why these tickers, what news drives them" }',
         "Pick 2-4 US-listed tickers. No prose outside the JSON."
       ),
       tw$now
@@ -45,7 +44,7 @@ run_pipeline <- function() {
   research <- fromJSON(s1$content)
   cat("  picks:", paste(research$picks, collapse = ", "), "\n")
 
-  cat("\n[stage 2] bars — model chooses timeframe and history window\n")
+  cat("\n[stage 2] bars\n")
   s2 <- ask_with_tools(
     prompt = sprintf(
       paste(
@@ -80,23 +79,21 @@ run_pipeline <- function() {
     bars_meta$days
   ))
 
-  cat("\n[stage 3] features — model chooses indicators and parameters\n")
+  cat("\n[stage 3] features (model picks specs via tool call; R does the math)\n")
   s3 <- ask_with_tools(
     prompt = sprintf(
       paste(
-        "Tickers: %s.",
-        "Rationale: %s",
-        "Bars already fetched: bars_id='%s', timeframe=%s, days=%s.",
+        "Tickers: %s. Rationale: %s",
         "",
-        "Call compute_features (you may call it multiple times if useful) on this bars_id.",
-        "CHOOSE each indicator AND its parameters deliberately based on the asset's character.",
+        "Bars are already cached at bars_id='%s' (timeframe=%s, days=%s).",
+        "",
+        "Call compute_features ONCE on that bars_id with a tailored set of indicators",
+        "for these names and this swing-trade horizon.",
         "Multi-instance same indicator with different params is encouraged",
         "(e.g. rsi period=7 AND period=21 for divergence).",
         "",
-        "After your tool calls, reply ONLY with JSON:",
-        '{ "indicators_table": "<paste the table you got back as a markdown table or readable text>",',
-        '  "specs_used": [ { "name": "...", ...params } ],',
-        '  "justification": "why you chose these indicators with these parameters" }'
+        "After the tool returns, reply ONLY with JSON:",
+        '{ "justification": "why you chose these indicators with these parameters" }'
       ),
       paste(research$picks, collapse = ", "),
       research$rationale,
@@ -108,45 +105,53 @@ run_pipeline <- function() {
     tools = list(TOOL_COMPUTE_FEATURES),
     handlers = TOOL_HANDLERS,
     json = TRUE,
-    max_tokens = 6000,
-    max_iter = 6,
+    max_tokens = 4000,
+    max_iter = 4,
     verbose = TRUE
   )
   analysis <- fromJSON(s3$content)
-  cat("  indicators chosen:\n")
-  print(analysis$specs_used)
+
+  bars <- tools_state$bars[[bars_meta$bars_id]]
+  cat("  added cols:", paste(attr(bars, "feature_cols"), collapse = ", "), "\n")
+
+  cat("\n[stage 3.5] R-derived signal (for our eyes only — not fed to model)\n")
+  signals <- derive_signals(bars)
+  print(signals)
 
   cat("\n[stage 4] decide\n")
+  recent <- bars[, tail(.SD, 10L), by = symbol]
+  recent_text <- paste(capture.output(print(recent)), collapse = "\n")
+
   s4 <- ask(
     prompt = paste(
-      "News rationale:\n",
+      "News rationale (from your earlier research):\n",
       research$rationale,
-      "\n\n",
-      "Indicator analysis (with the parameters you chose):\n",
-      analysis$indicators_table,
-      "\n\n",
-      "Your justification for those parameters:\n",
+      "\n\nLast 10 bars per symbol with the indicators YOU chose to compute",
+      "(parameter choices encoded in the column names):\n",
+      recent_text,
+      "\n\nYour earlier justification for the indicator parameters:\n",
       analysis$justification,
-      "\n\n",
-      "Reply ONLY with JSON of the form:",
-      '{ "decisions": [ { "ticker": "X", "action": "buy"|"sell"|"hold", "confidence": 0.0-1.0, "reason": "one sentence grounded in the indicators above" } ] }'
+      "\n\nReply ONLY with JSON of the form:",
+      '{ "decisions": [ { "ticker": "X", "action": "buy"|"sell"|"hold", "confidence": 0.0-1.0, "reason": "one sentence grounded in the table above" } ] }'
     ),
     system = prompts$IDENTITY_TRADER,
     json = TRUE,
     max_tokens = 4000
   )
   decisions <- fromJSON(s4$content, simplifyDataFrame = TRUE)
-  cat("\n--- decisions ---\n")
+  cat("\n--- model decisions ---\n")
   print(decisions$decisions)
 
-  # ---- STAGE 5: execute (stubbed for now) --------------------------------
-  # buys  <- decisions$decisions[decisions$decisions$action == "buy",  "ticker"]
-  # sells <- decisions$decisions[decisions$decisions$action == "sell", "ticker"]
-  # if (length(buys))  market$buy(buys)
-  # if (length(sells)) market$sell(sells)
+  cat("\n--- comparison: programmatic vs model ---\n")
+  print(merge(
+    signals[, list(symbol, prog_signal = signal, prog_score = score)],
+    as.data.table(decisions$decisions)[, list(symbol = ticker, model_action = action, model_conf = confidence)],
+    by = "symbol",
+    all = TRUE
+  ))
 
   iteration <<- iteration + 1
-  invisible(decisions)
+  invisible(list(research = research, bars = bars, signals = signals, decisions = decisions))
 }
 
 setInterval(run_pipeline, 60 * 60 * 3)

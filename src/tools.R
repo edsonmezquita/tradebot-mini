@@ -1,7 +1,7 @@
 box::use(
   ./searxng[search],
   ./alpaca[market],
-  ./features[compute_features, FEATURE_REGISTRY],
+  ./features[compute_features, FEATURE_REGISTRY, format_feature_menu, latest_per_symbol],
   lubridate
 )
 
@@ -93,30 +93,6 @@ TOOL_GET_BARS <- list(
 )
 
 # ---- TOOL: compute_features -----------------------------------------------
-.feature_menu <- paste(
-  vapply(
-    names(FEATURE_REGISTRY),
-    function(n) {
-      entry <- FEATURE_REGISTRY[[n]]
-      params <- entry$params
-      if (length(params) == 0L) {
-        param_str <- "(no params)"
-      } else {
-        param_str <- paste(
-          vapply(
-            names(params),
-            function(p) sprintf("%s=%s", p, paste(params[[p]], collapse = ",")),
-            character(1)
-          ),
-          collapse = ", "
-        )
-      }
-      sprintf("- %s [defaults: %s]: %s", n, param_str, entry$description)
-    },
-    character(1)
-  ),
-  collapse = "\n"
-)
 
 #' @export
 TOOL_COMPUTE_FEATURES <- list(
@@ -133,7 +109,7 @@ TOOL_COMPUTE_FEATURES <- list(
       "parameters to compare (e.g. rsi period=7 AND period=21).\n\n",
       "Each feature is an OBJECT: { \"name\": \"<feature>\", ...params }.\n\n",
       "Available features (defaults shown — override any of them):\n",
-      .feature_menu
+      format_feature_menu()
     ),
     parameters = list(
       type = "object",
@@ -255,9 +231,10 @@ handle_compute_features <- function(args) {
     )
   }
   bars <- get(bars_id, envir = tools_state$bars)
-  # `features` arrives as a list of named lists (one per feature spec),
-  # already parsed from JSON by ask_with_tools. Pass straight through.
-  return(compute_features(bars = bars, features = args$features))
+  # compute_features mutates and returns bars-with-indicator-columns;
+  # we hand the model back just the latest row per symbol.
+  bars_w <- compute_features(bars = bars, features = args$features)
+  return(latest_per_symbol(bars_w))
 }
 
 #' Handlers bundled for ask_with_tools(). Names must match `function$name`.
