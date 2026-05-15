@@ -4,7 +4,7 @@ box::use(
   utils[ tail ],
   utils[ capture.output ],
   ./src/utils[ setInterval, get_time_window ],
-  ./src/deepseek[ ask, ask_with_tools ],
+  ./src/deepseek[ ask, ask_with_tools, extract_tool_results ],
   ./src/prompts,
   ./src/tools[
     TOOL_SEARCH, TOOL_GET_BARS, TOOL_COMPUTE_FEATURES,
@@ -29,6 +29,7 @@ setInterval(
     ))
 
     cat("\n[stage 1] research\n")
+    max_retries <- 3
     research_response <- ask_with_tools(
       prompt = sprintf(
         paste(
@@ -52,16 +53,39 @@ setInterval(
       verbose = TRUE
     )
     research <- fromJSON(research_response$content)
+    prior_news <- extract_tool_results(research_response$messages)
 
-    validation <- validate_picks(research$picks)
-    if (length(validation$invalid) > 0) {
-      cat("  dropped invalid picks:", paste(validation$invalid, collapse = ", "), "\n")
+    for (attempt in seq_len(max_retries + 1L)) {
+      validation <- validate_picks(research$picks)
+      if (length(validation$invalid) > 0) {
+        cat("  dropped invalid picks:", paste(validation$invalid, collapse = ", "), "\n")
+      }
+      if (length(validation$valid) > 0) {
+        research$picks <- validation$valid
+        cat("  picks:", paste(research$picks, collapse = ", "), "\n")
+        break
+      }
+      if (attempt > max_retries) {
+        stop("All picks invalid after ", max_retries, " retries; aborting iteration.")
+      }
+      cat(sprintf("  retry %d/%d: all picks invalid, re-asking with prior news\n", attempt, max_retries))
+      retry_response <- ask(
+        prompt = paste(
+          "Earlier news searches returned the following results:\n\n",
+          prior_news,
+          "\n\nYour previous picks were ALL rejected — these are NOT tradable on Alpaca: ",
+          paste(validation$invalid, collapse = ", "),
+          "\n\nPick 2-4 DIFFERENT US-listed tickers from the news above that ARE tradable on",
+          "Alpaca (NYSE / NASDAQ / ARCA / AMEX). Use exact exchange symbols (e.g. BRK.B not BERKSHIRE).",
+          "\n\nReply ONLY with JSON:",
+          '{ "picks": ["TICKER1","TICKER2",...], "rationale": "one paragraph" }'
+        ),
+        system = prompts$IDENTITY_TRADER,
+        json = TRUE,
+        max_tokens = 4000
+      )
+      research <- fromJSON(retry_response$content)
     }
-    if (length(validation$valid) == 0) {
-      stop("All picks invalid against Alpaca tradable universe; aborting iteration.")
-    }
-    research$picks <- validation$valid
-    cat("  picks:", paste(research$picks, collapse = ", "), "\n")
 
     cat("\n[stage 2] bars\n")
     bars_response <- ask_with_tools(

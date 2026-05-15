@@ -33,6 +33,30 @@ box::use(
 }
 
 # ---- public ---------------------------------------------------------------
+
+#' Extract the textual content of every `role: "tool"` message from a
+#' conversation transcript (the `messages` field returned by ask_with_tools).
+#' Useful when re-prompting after validation failure so you don't re-run
+#' expensive tool calls (e.g. searches).
+#' @export
+extract_tool_results <- function(messages) {
+  tool_msgs <- Filter(
+    function(m) !is.null(m$role) && m$role == "tool",
+    messages
+  )
+  if (length(tool_msgs) == 0L) {
+    return("")
+  }
+  paste(
+    vapply(
+      tool_msgs,
+      function(m) paste0("[tool result]\n", as.character(m$content)),
+      character(1)
+    ),
+    collapse = "\n\n"
+  )
+}
+
 #' Call the DeepSeek chat completions API.
 #'
 #' @param prompt User message (string).

@@ -1,34 +1,28 @@
 box::use(
-  httr2,
-  data.table[ as.data.table, fread, fwrite, setorder ]
+  data.table[ as.data.table, fread, fwrite, setorder ],
+  ./alpaca[ market ]
 )
 
 # In-memory cache (per R session).
 .universe_cache <- new.env(parent = emptyenv())
 
 # On-disk cache (persists across sessions). Refreshed when file age exceeds TTL.
-.CACHE_PATH    <- "cache/alpaca_universe.csv"
+.CACHE_PATH <- "cache/alpaca_universe.csv"
 .CACHE_TTL_DAYS <- 30L
 
 .cache_age_days <- function(path) {
-  if (!file.exists(path)) return(Inf)
+  if (!file.exists(path)) {
+    return(Inf)
+  }
   as.numeric(difftime(Sys.time(), file.info(path)$mtime, units = "days"))
 }
 
 .fetch_universe_from_alpaca <- function() {
-  resp <- httr2$request("https://paper-api.alpaca.markets") |>
-    httr2$req_url_path("/v2/assets") |>
-    httr2$req_url_query(status = "active", asset_class = "us_equity") |>
-    httr2$req_headers(
-      `APCA-API-KEY-ID`     = Sys.getenv("ALPACA_API_KEY"),
-      `APCA-API-SECRET-KEY` = Sys.getenv("ALPACA_API_SECRET")
-    ) |>
-    httr2$req_timeout(30) |>
-    httr2$req_perform()
-
-  raw <- httr2$resp_body_json(resp, simplifyVector = TRUE)
-  assets <- as.data.table(raw)
+  assets <- market$get_assets(status = "active", asset_class = "us_equity")
   assets <- assets[tradable == TRUE]
+  if ("attributes" %in% names(assets)) {
+    assets[, attributes := NULL]
+  }
   setorder(assets, symbol)
   return(assets)
 }
@@ -56,8 +50,7 @@ get_tradable_universe <- function(refresh = FALSE) {
     if (refresh) {
       cat("[universe] refresh=TRUE; fetching from Alpaca\n")
     } else {
-      cat(sprintf("[universe] cache stale (%.1f days, ttl=%d); fetching from Alpaca\n",
-                  age, .CACHE_TTL_DAYS))
+      cat(sprintf("[universe] cache stale (%.1f days, ttl=%d); fetching from Alpaca\n", age, .CACHE_TTL_DAYS))
     }
     assets <- .fetch_universe_from_alpaca()
     if (!dir.exists(dirname(.CACHE_PATH))) {
@@ -81,7 +74,7 @@ validate_picks <- function(picks) {
   universe <- get_tradable_universe()
   ok <- picks %in% universe$symbol
   list(
-    valid   = picks[ok],
+    valid = picks[ok],
     invalid = picks[!ok]
   )
 }
