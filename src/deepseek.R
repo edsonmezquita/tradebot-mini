@@ -4,7 +4,6 @@ box::use(
 )
 
 # ---- internal -------------------------------------------------------------
-
 .post <- function(body, api_key, timeout) {
   resp <- httr2$request("https://api.deepseek.com") |>
     httr2$req_url_path("/chat/completions") |>
@@ -34,7 +33,6 @@ box::use(
 }
 
 # ---- public ---------------------------------------------------------------
-
 #' Call the DeepSeek chat completions API.
 #'
 #' @param prompt User message (string).
