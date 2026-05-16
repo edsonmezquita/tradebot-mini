@@ -1,7 +1,8 @@
 box::use(
   jsonlite[ fromJSON ],
   ../scrape[ scrape ],
-  ../deepseek[ ask ]
+  ../deepseek[ ask ],
+  ../db[ scraped_pages_get, scraped_pages_put ]
 )
 
 #' @export
@@ -58,11 +59,30 @@ TOOL_SCRAPE_URL <- list(
 
 #' @export
 handle_scrape_url <- function(args) {
+  # Cache check first — if we scraped this URL in the last 7 days, return
+  # the cached content (or the cached rejection notice) without re-hitting
+  # the target or DeepSeek.
+  hit <- scraped_pages_get(args$url, ttl_days = 7)
+  if (!is.null(hit)) {
+    cat(sprintf("  [scrape cache] HIT url=%s age=%.1fd usable=%s\n",
+                args$url, hit$age_days, hit$grade_usable))
+    if (isTRUE(hit$grade_usable)) {
+      return(hit$content)
+    }
+    return(sprintf("(scrape rejected — cached: %s)", hit$grade_reason))
+  }
+
   content <- scrape(args$url)
   if (startsWith(content, "(scrape failed")) {
     return(content)
   }
   grade <- .grade_content(content)
+  scraped_pages_put(
+    url          = args$url,
+    content      = content,
+    grade_usable = isTRUE(grade$usable),
+    grade_reason = as.character(grade$reason)
+  )
   if (isTRUE(grade$usable)) {
     return(content)
   }

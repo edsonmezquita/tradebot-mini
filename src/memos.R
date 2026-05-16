@@ -1,17 +1,15 @@
 box::use(
-  data.table[ data.table, fread, fwrite, setorder ],
-  lubridate
+  ./db[ memos_insert, memos_read, new_cycle_id ]
 )
 
-.MEMOS_PATH <- "state/memos.csv"
-
-#' Append a cycle memo to state/memos.csv. Creates file/dir if missing.
+#' Append a cycle memo to the database.
 #' @param picks character vector of tickers considered this cycle.
 #' @param decisions list from TOOL_SUBMIT_TRADES (each: ticker, action, notional, ...).
 #' @param memo one short factual paragraph from the model.
+#' @param cycle_id Optional pre-generated cycle id (UUID string). If NULL one is created.
 #' @export
-write_memo <- function(picks, decisions, memo) {
-  buys <- character()
+write_memo <- function(picks, decisions, memo, cycle_id = NULL) {
+  buys  <- character()
   sells <- character()
   holds <- character()
   for (d in decisions) {
@@ -23,65 +21,21 @@ write_memo <- function(picks, decisions, memo) {
       holds <- c(holds, d$ticker)
     }
   }
-
-  row <- data.table(
-    timestamp = format(lubridate$now(tzone = "UTC"), "%Y-%m-%dT%H:%M:%SZ"),
-    picks = paste(picks, collapse = ","),
-    buys = paste(buys, collapse = ","),
-    sells = paste(sells, collapse = ","),
-    holds = paste(holds, collapse = ","),
-    memo = memo
+  if (is.null(cycle_id)) cycle_id <- new_cycle_id()
+  memos_insert(
+    cycle_id = cycle_id,
+    picks    = paste(picks,  collapse = ","),
+    buys     = paste(buys,   collapse = ","),
+    sells    = paste(sells,  collapse = ","),
+    holds    = paste(holds,  collapse = ","),
+    memo     = memo
   )
-
-  if (!dir.exists(dirname(.MEMOS_PATH))) {
-    dir.create(dirname(.MEMOS_PATH), recursive = TRUE)
-  }
-  fwrite(row, .MEMOS_PATH, append = file.exists(.MEMOS_PATH))
-  invisible(row)
+  invisible()
 }
 
-#' Read memos with optional filtering.
-#' @param limit integer, max rows to return.
-#' @param order "newest" or "oldest".
-#' @param ticker optional, only memos that mention this symbol.
-#' @param since optional ISO timestamp floor (string compare on the timestamp col).
-#' @param until optional ISO timestamp ceiling.
-#' @return data.table (possibly empty).
+#' Read memos with optional filtering. Thin pass-through to the DB layer.
 #' @export
-read_memos <- function(
-  limit = 10L,
-  order = "newest",
-  ticker = NULL,
-  since = NULL,
-  until = NULL
-) {
-  if (!file.exists(.MEMOS_PATH)) {
-    return(data.table())
-  }
-  m <- fread(.MEMOS_PATH)
-  if (nrow(m) == 0L) {
-    return(m)
-  }
-
-  if (!is.null(ticker) && nzchar(ticker)) {
-    pat <- paste0("(^|,)", toupper(ticker), "(:|,|$)")
-    m <- m[
-      grepl(pat, picks) | grepl(pat, buys) | grepl(pat, sells) | grepl(pat, holds)
-    ]
-  }
-  if (!is.null(since) && nzchar(since)) {
-    m <- m[timestamp >= since]
-  }
-  if (!is.null(until) && nzchar(until)) {
-    m <- m[timestamp <= until]
-  }
-
-  setorder(m, timestamp)
-  if (order == "newest") {
-    m <- m[order(-timestamp)]
-  }
-  if (!is.null(limit) && nrow(m) > limit) {
-    m <- m[seq_len(limit)]
-  }
-  return(m)
+read_memos <- function(limit  = 10L, order  = "newest",
+                       ticker = NULL, since  = NULL, until  = NULL) {
+  memos_read(limit = limit, order = order, ticker = ticker, since = since, until = until)
 }

@@ -1,80 +1,59 @@
 box::use(
-  data.table[ as.data.table, fread, fwrite, setorder ],
-  ./alpaca[ market ]
+  data.table[ as.data.table, setorder ],
+  ./alpaca[ market ],
+  ./db[ alpaca_assets_age_days, alpaca_assets_read, alpaca_assets_replace ]
 )
 
-# In-memory cache (per R session).
-.universe_cache <- new.env(parent = emptyenv())
-
-# On-disk cache (persists across sessions). Refreshed when file age exceeds TTL.
-.CACHE_PATH <- "cache/alpaca_universe.csv"
 .CACHE_TTL_DAYS <- 30L
 
-.cache_age_days <- function(path) {
-  if (!file.exists(path)) {
-    return(Inf)
-  }
-  as.numeric(difftime(Sys.time(), file.info(path)$mtime, units = "days"))
-}
+# Per-session in-memory cache so repeated calls within one cycle skip the DB.
+.mem_cache <- new.env(parent = emptyenv())
 
 .fetch_universe_from_alpaca <- function() {
   assets <- market$get_assets(status = "active", asset_class = "us_equity")
   assets <- assets[tradable == TRUE]
-  if ("attributes" %in% names(assets)) {
-    assets[, attributes := NULL]
-  }
+  if ("attributes" %in% names(assets)) assets[, attributes := NULL]
   setorder(assets, symbol)
   return(assets)
 }
 
-#' Fetch (and cache) the universe of tradable US-equity assets on Alpaca.
-#'
-#' Caching:
-#'   1. In-memory cache (per R session) — avoids re-reads.
-#'   2. On-disk CSV at cache/alpaca_universe.csv — refreshed when older than
-#'      `.CACHE_TTL_DAYS` (30 days) or when `refresh = TRUE` is passed.
-#'
-#' @param refresh Force a re-fetch from Alpaca even if cached.
-#' @return data.table with cols symbol, name, exchange, tradable, fractionable, ...
+#' Fetch (and cache) the tradable US-equity universe. Cached in the DB —
+#' refreshed once `.CACHE_TTL_DAYS` (30) days old, or when `refresh = TRUE`.
 #' @export
 get_tradable_universe <- function(refresh = FALSE) {
-  if (!refresh && exists("assets", envir = .universe_cache)) {
-    return(get("assets", envir = .universe_cache))
+  if (!refresh && exists("assets", envir = .mem_cache)) {
+    return(get("assets", envir = .mem_cache))
   }
 
-  age <- .cache_age_days(.CACHE_PATH)
+  age <- alpaca_assets_age_days()
   if (!refresh && age <= .CACHE_TTL_DAYS) {
-    cat(sprintf("[universe] loading from disk cache (%.1f days old)\n", age))
-    assets <- fread(.CACHE_PATH)
+    cat(sprintf("[universe] loading from DB cache (%.1f days old)\n", age))
+    assets <- alpaca_assets_read()
   } else {
     if (refresh) {
       cat("[universe] refresh=TRUE; fetching from Alpaca\n")
     } else {
-      cat(sprintf("[universe] cache stale (%.1f days, ttl=%d); fetching from Alpaca\n", age, .CACHE_TTL_DAYS))
+      cat(sprintf("[universe] cache stale (%.1f days, ttl=%d); fetching from Alpaca\n",
+                  age, .CACHE_TTL_DAYS))
     }
     assets <- .fetch_universe_from_alpaca()
-    if (!dir.exists(dirname(.CACHE_PATH))) {
-      dir.create(dirname(.CACHE_PATH), recursive = TRUE)
-    }
-    fwrite(assets, .CACHE_PATH)
-    cat(sprintf("[universe] wrote %d assets to %s\n", nrow(assets), .CACHE_PATH))
+    alpaca_assets_replace(assets)
+    cat(sprintf("[universe] wrote %d assets to DB\n", nrow(assets)))
   }
 
-  assign("assets", assets, envir = .universe_cache)
+  assign("assets", assets, envir = .mem_cache)
   return(assets)
 }
 
-#' Validate a vector of tickers against the Alpaca-tradable universe.
-#'
-#' @param picks Character vector of ticker symbols (case-insensitive).
-#' @return list(valid = <chr>, invalid = <chr>) — both upper-cased.
+#' Validate a vector of tickers against the universe.
+#' @return list(valid = <chr>, invalid = <chr>)
 #' @export
 validate_picks <- function(picks) {
   picks <- toupper(as.character(picks))
   universe <- get_tradable_universe()
   ok <- picks %in% universe$symbol
   list(
-    valid = picks[ok],
+    valid   = picks[ok],
     invalid = picks[!ok]
   )
 }

@@ -1,9 +1,10 @@
 box::use(
   httr2,
   digest[ hmac ],
-  jsonlite[ toJSON, fromJSON, base64_enc ],
+  jsonlite[ toJSON, base64_enc ],
   data.table[ as.data.table, data.table, rbindlist ],
-  utils[ URLencode ]
+  utils[ URLencode ],
+  ./db[ twitter_state_load, twitter_state_save ]
 )
 
 # ---- OAuth 1.0a signing ----------------------------------------------------
@@ -182,31 +183,17 @@ get_mentions <- function(user_id, since_id = NULL, max_results = 20L) {
   )
 }
 
-.STATE_PATH <- "state/twitter_state.json"
-
-#' Load persisted Twitter state (user_id, last_mention_id, last_tweet_id, last_tweet_at).
-#' Returns an empty list on first run.
+#' Load persisted Twitter state from the DB.
 #' @export
 load_twitter_state <- function() {
-  if (!file.exists(.STATE_PATH)) {
-    return(list())
-  }
-  tryCatch(fromJSON(.STATE_PATH), error = function(e) list())
+  twitter_state_load()
 }
 
 #' Persist Twitter state. Pass any subset of fields to merge into existing state.
 #' @export
 save_twitter_state <- function(...) {
-  current <- load_twitter_state()
-  updates <- list(...)
-  for (k in names(updates)) {
-    current[[k]] <- updates[[k]]
-  }
-  if (!dir.exists(dirname(.STATE_PATH))) {
-    dir.create(dirname(.STATE_PATH), recursive = TRUE)
-  }
-  writeLines(toJSON(current, auto_unbox = TRUE, pretty = TRUE), .STATE_PATH)
-  invisible(current)
+  twitter_state_save(...)
+  invisible(twitter_state_load())
 }
 
 #' Read replies to a specific tweet (via conversation_id search).
