@@ -1,7 +1,7 @@
 box::use(
   lubridate,
   jsonlite[ fromJSON ],
-  data.table[ as.data.table, rbindlist, tail ],
+  data.table[ data.table, as.data.table, rbindlist, tail ],
   utils[ capture.output ],
   ./src/utils[ get_time_window, format_dt_md ],
   ./src/deepseek[ ask, ask_with_tools, ask_for_args ],
@@ -75,7 +75,7 @@ cycle_result <- tryCatch({
   mentions <- tryCatch(
     get_mentions(user_id = tw_state$user_id, since_id = tw_state$last_mention_id),
     error = function(e) {
-      cat("  mentions fetch failed:", conditionMessage(e), "\n"); data.table::data.table()
+      cat("  mentions fetch failed:", conditionMessage(e), "\n"); data.table()
     }
   )
   cat("  ", nrow(mentions), " new mentions since last cycle\n", sep = "")
