@@ -8,14 +8,15 @@ box::use(
   ./src/deepseek[ ask, ask_with_tools, ask_for_args ],
   ./src/prompts,
   ./src/tools[
-    TOOL_SEARCH, TOOL_VALIDATE_SYMBOLS,
+    TOOL_SEARCH, TOOL_VALIDATE_SYMBOLS, TOOL_RECALL_MEMOS,
     TOOL_GET_BARS_MULTI, TOOL_COMPUTE_FEATURES,
     TOOL_SUBMIT_TRADES, TOOL_HANDLERS
   ],
   ./src/features[ compute_features ],
   ./src/signals[ derive_signals ],
   ./src/alpaca[ market, trading ],
-  ./src/portfolio[ get_account_state, get_positions_with_age, get_open_orders ]
+  ./src/portfolio[ get_account_state, get_positions_with_age, get_open_orders ],
+  ./src/memos[ write_memo ]
 )
 
 iteration <- 0
@@ -35,6 +36,9 @@ setInterval(
       prompt = sprintf(
         paste(
           "Today is %s.",
+          "0) OPTIONALLY call recall_memos to see what you've been doing recently.",
+          "   Useful for continuity (don't re-pitch a trade you opened 2 days ago)",
+          "   or for follow-up on positions still on your books.",
           "1) Use the search tool (1-3 queries) to find current market-moving news.",
           "2) Draft 2-4 candidate tickers (US-listed, NYSE/NASDAQ/ARCA/AMEX, common stock — use exact exchange symbols, e.g. BRK.B not BERKSHIRE).",
           "3) Call validate_symbols on your draft. Replace any invalid ones and re-validate until all are valid.",
@@ -45,7 +49,7 @@ setInterval(
         time_window$now
       ),
       system = prompts$IDENTITY_TRADER,
-      tools = list(TOOL_SEARCH, TOOL_VALIDATE_SYMBOLS),
+      tools = list(TOOL_SEARCH, TOOL_VALIDATE_SYMBOLS, TOOL_RECALL_MEMOS),
       handlers = TOOL_HANDLERS,
       json = TRUE,
       max_tokens = 4000,
@@ -235,6 +239,14 @@ setInterval(
         ))
       }
     }
+
+    cat("\n[stage 6] persist memo\n")
+    write_memo(
+      picks     = research$picks,
+      decisions = decisions,
+      memo      = decision_args$memo
+    )
+    cat("  memo:", decision_args$memo, "\n")
 
     iteration <<- iteration + 1
     invisible(list(research = research, bars = bars, signals = signals, decisions = decisions))

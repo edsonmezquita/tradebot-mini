@@ -6,6 +6,7 @@
 box::use(
   ./search          [ TOOL_SEARCH,            handle_search           ],
   ./validate_symbols[ TOOL_VALIDATE_SYMBOLS,  handle_validate_symbols ],
+  ./recall_memos    [ TOOL_RECALL_MEMOS,      handle_recall_memos     ],
   ./get_bars_multi  [ TOOL_GET_BARS_MULTI                             ],
   ./compute_features[ TOOL_COMPUTE_FEATURES                           ],
   ./submit_trades   [ TOOL_SUBMIT_TRADES                              ]
@@ -18,6 +19,9 @@ TOOL_SEARCH <- TOOL_SEARCH
 TOOL_VALIDATE_SYMBOLS <- TOOL_VALIDATE_SYMBOLS
 
 #' @export
+TOOL_RECALL_MEMOS <- TOOL_RECALL_MEMOS
+
+#' @export
 TOOL_GET_BARS_MULTI <- TOOL_GET_BARS_MULTI
 
 #' @export
@@ -26,9 +30,10 @@ TOOL_COMPUTE_FEATURES <- TOOL_COMPUTE_FEATURES
 #' @export
 TOOL_SUBMIT_TRADES <- TOOL_SUBMIT_TRADES
 
-#' Handlers for tools that participate in agentic loops (search + validate).
+#' Handlers for tools that participate in agentic loops.
 #' @export
 TOOL_HANDLERS <- list(
-  search = handle_search,
-  validate_symbols = handle_validate_symbols
+  search           = handle_search,
+  validate_symbols = handle_validate_symbols,
+  recall_memos     = handle_recall_memos
 )

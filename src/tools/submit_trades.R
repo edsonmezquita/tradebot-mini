@@ -44,9 +44,21 @@ TOOL_SUBMIT_TRADES <- list(
             ),
             required = list("ticker", "action", "confidence", "reason")
           )
+        ),
+        memo = list(
+          type = "string",
+          description = paste(
+            "1-3 SHORT sentences summarising what you did this cycle and why.",
+            "Persisted to history (state/memos.csv) for future cycles to recall.",
+            "STRICT: facts only — past tense, no predictions, no targets, no",
+            "hopes about what will happen next. Mention tickers, sizes, and the",
+            "concrete signal/news that drove each action.",
+            "Good: 'Bought NVDA $3000 (post-earnings gap, RSI7 87 but trend dominant). Held UPS — opened 2 days ago.'",
+            "Bad: 'NVDA looks like it will break $250 soon, watching for entry.'"
+          )
         )
       ),
-      required = list("decisions")
+      required = list("decisions", "memo")
     )
   )
 )

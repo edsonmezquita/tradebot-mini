@@ -1,0 +1,3 @@
+timestamp,picks,buys,sells,holds,memo
+2026-05-16T01:05:22Z,"NVDA,UPS,TSLA",NVDA:3000,TSLA:2500,UPS,Bought NVDA $3000 on earnings gap; sold TSLA $2500 (RSI7 overbought after 5-day rip); held UPS — opened 2 days ago.
+2026-05-16T01:05:22Z,AAPL,AAPL:1500,"","",Bought AAPL $1500 on pullback to 20EMA.
