@@ -1,7 +1,7 @@
 box::use(
-  data.table[ data.table, setorder ],
+  data.table[data.table, setorder],
   lubridate,
-  ./alpaca[ account, trading ]
+  ./alpaca[account, trading]
 )
 
 # ----------------------------------------------------------------------------
@@ -13,7 +13,7 @@ box::use(
 #' @export
 get_account_state <- function() {
   acc <- account$get_account()
-  list(
+  return(list(
     cash = as.numeric(acc$cash),
     equity = as.numeric(acc$equity),
     portfolio_value = as.numeric(acc$portfolio_value),
@@ -22,7 +22,7 @@ get_account_state <- function() {
     short_market_val = as.numeric(acc$short_market_value),
     daytrade_count = as.integer(acc$daytrade_count),
     pattern_day_trader = isTRUE(acc$pattern_day_trader)
-  )
+  ))
 }
 
 #' Open positions joined with "days held" derived from the most recent BUY
@@ -73,7 +73,7 @@ get_open_orders <- function() {
   if (nrow(ord) == 0L) {
     return(data.table())
   }
-  ord[, list(
+  return(ord[, list(
     symbol,
     side,
     qty = as.numeric(qty),
@@ -81,5 +81,5 @@ get_open_orders <- function() {
     limit_price = as.numeric(limit_price),
     time_in_force,
     submitted_at
-  )]
+  )])
 }

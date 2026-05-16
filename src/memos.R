@@ -1,5 +1,5 @@
 box::use(
-  ./db[ memos_insert, memos_read, new_cycle_id ]
+  ./db[memos_insert, memos_read, new_cycle_id]
 )
 
 #' Append a cycle memo to the database.
@@ -9,7 +9,7 @@ box::use(
 #' @param cycle_id Optional pre-generated cycle id (UUID string). If NULL one is created.
 #' @export
 write_memo <- function(picks, decisions, memo, cycle_id = NULL) {
-  buys  <- character()
+  buys <- character()
   sells <- character()
   holds <- character()
   for (d in decisions) {
@@ -21,21 +21,22 @@ write_memo <- function(picks, decisions, memo, cycle_id = NULL) {
       holds <- c(holds, d$ticker)
     }
   }
-  if (is.null(cycle_id)) cycle_id <- new_cycle_id()
+  if (is.null(cycle_id)) {
+    cycle_id <- new_cycle_id()
+  }
   memos_insert(
     cycle_id = cycle_id,
-    picks    = paste(picks,  collapse = ","),
-    buys     = paste(buys,   collapse = ","),
-    sells    = paste(sells,  collapse = ","),
-    holds    = paste(holds,  collapse = ","),
-    memo     = memo
+    picks = paste(picks, collapse = ","),
+    buys = paste(buys, collapse = ","),
+    sells = paste(sells, collapse = ","),
+    holds = paste(holds, collapse = ","),
+    memo = memo
   )
-  invisible()
+  return(invisible())
 }
 
 #' Read memos with optional filtering. Thin pass-through to the DB layer.
 #' @export
-read_memos <- function(limit  = 10L, order  = "newest",
-                       ticker = NULL, since  = NULL, until  = NULL) {
-  memos_read(limit = limit, order = order, ticker = ticker, since = since, until = until)
+read_memos <- function(limit = 10L, order = "newest", ticker = NULL, since = NULL, until = NULL) {
+  return(memos_read(limit = limit, order = order, ticker = ticker, since = since, until = until))
 }

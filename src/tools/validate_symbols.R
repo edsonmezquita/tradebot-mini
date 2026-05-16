@@ -1,5 +1,5 @@
 box::use(
-  ../universe[ validate_picks ]
+  ../universe[validate_picks]
 )
 
 #' @export
@@ -34,5 +34,5 @@ TOOL_VALIDATE_SYMBOLS <- list(
 #' @export
 handle_validate_symbols <- function(args) {
   symbols <- unlist(args$symbols, use.names = FALSE)
-  validate_picks(symbols)
+  return(validate_picks(symbols))
 }

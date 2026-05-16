@@ -1,7 +1,7 @@
 box::use(
-  data.table[ as.data.table, setorder ],
-  ./alpaca[ market ],
-  ./db[ alpaca_assets_age_days, alpaca_assets_read, alpaca_assets_replace ]
+  data.table[as.data.table, setorder],
+  ./alpaca[market],
+  ./db[alpaca_assets_age_days, alpaca_assets_read, alpaca_assets_replace]
 )
 
 .CACHE_TTL_DAYS <- 30L
@@ -12,7 +12,9 @@ box::use(
 .fetch_universe_from_alpaca <- function() {
   assets <- market$get_assets(status = "active", asset_class = "us_equity")
   assets <- assets[tradable == TRUE]
-  if ("attributes" %in% names(assets)) assets[, attributes := NULL]
+  if ("attributes" %in% names(assets)) {
+    assets[, attributes := NULL]
+  }
   setorder(assets, symbol)
   return(assets)
 }
@@ -33,8 +35,7 @@ get_tradable_universe <- function(refresh = FALSE) {
     if (refresh) {
       cat("[universe] refresh=TRUE; fetching from Alpaca\n")
     } else {
-      cat(sprintf("[universe] cache stale (%.1f days, ttl=%d); fetching from Alpaca\n",
-                  age, .CACHE_TTL_DAYS))
+      cat(sprintf("[universe] cache stale (%.1f days, ttl=%d); fetching from Alpaca\n", age, .CACHE_TTL_DAYS))
     }
     assets <- .fetch_universe_from_alpaca()
     alpaca_assets_replace(assets)
@@ -52,8 +53,8 @@ validate_picks <- function(picks) {
   picks <- toupper(as.character(picks))
   universe <- get_tradable_universe()
   ok <- picks %in% universe$symbol
-  list(
-    valid   = picks[ok],
+  return(list(
+    valid = picks[ok],
     invalid = picks[!ok]
-  )
+  ))
 }

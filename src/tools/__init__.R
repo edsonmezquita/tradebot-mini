@@ -4,14 +4,14 @@
 #' box::use line and the TOOL_HANDLERS list below.
 
 box::use(
-  ./search          [ TOOL_SEARCH,            handle_search           ],
-  ./validate_symbols[ TOOL_VALIDATE_SYMBOLS,  handle_validate_symbols ],
-  ./recall_memos    [ TOOL_RECALL_MEMOS,      handle_recall_memos     ],
-  ./scrape_url      [ TOOL_SCRAPE_URL,        handle_scrape_url       ],
-  ./get_bars_multi  [ TOOL_GET_BARS_MULTI                             ],
-  ./compute_features[ TOOL_COMPUTE_FEATURES                           ],
-  ./submit_trades   [ TOOL_SUBMIT_TRADES                              ],
-  ./post_tweets     [ TOOL_POST_TWEETS                                ]
+  ./search          [TOOL_SEARCH,            handle_search],
+  ./validate_symbols[TOOL_VALIDATE_SYMBOLS,  handle_validate_symbols],
+  ./recall_memos    [TOOL_RECALL_MEMOS,      handle_recall_memos],
+  ./scrape_url      [TOOL_SCRAPE_URL,        handle_scrape_url],
+  ./get_bars_multi  [TOOL_GET_BARS_MULTI],
+  ./compute_features[TOOL_COMPUTE_FEATURES],
+  ./submit_trades   [TOOL_SUBMIT_TRADES],
+  ./post_tweets     [TOOL_POST_TWEETS]
 )
 
 #' @export

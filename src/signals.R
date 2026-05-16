@@ -1,6 +1,6 @@
 box::use(
-  data.table[ as.data.table, setorder, rbindlist ],
-  utils[ tail ]
+  data.table[as.data.table, setorder, rbindlist],
+  utils[tail]
 )
 
 # Each rule fn takes a row (named list) + a state list (score, reasons) and
@@ -10,7 +10,7 @@ box::use(
 .add <- function(state, delta, msg) {
   state$score <- state$score + as.integer(delta)
   state$reasons <- c(state$reasons, sprintf("%s (%+d)", msg, as.integer(delta)))
-  state
+  return(state)
 }
 
 .rule_rsi <- function(row, state) {
@@ -29,7 +29,7 @@ box::use(
       state <- .add(state, -1L, sprintf("%s=%.1f above midline", col, v))
     }
   }
-  state
+  return(state)
 }
 
 .rule_macd_hist <- function(row, state) {
@@ -44,7 +44,7 @@ box::use(
       state <- .add(state, -2L, sprintf("%s=%.3f bearish", col, v))
     }
   }
-  state
+  return(state)
 }
 
 .rule_supertrend <- function(row, state) {
@@ -59,7 +59,7 @@ box::use(
       state <- .add(state, -2L, sprintf("%s=downtrend", col))
     }
   }
-  state
+  return(state)
 }
 
 .rule_ema_cross <- function(row, state) {
@@ -74,7 +74,7 @@ box::use(
       state <- .add(state, -1L, sprintf("%s=bearish", col))
     }
   }
-  state
+  return(state)
 }
 
 .rule_bbands <- function(row, state) {
@@ -89,7 +89,7 @@ box::use(
       state <- .add(state, 1L, sprintf("%s=%.2f below lower band", col, v))
     }
   }
-  state
+  return(state)
 }
 
 .rule_obv_slope <- function(row, state) {
@@ -104,7 +104,7 @@ box::use(
       state <- .add(state, -1L, sprintf("%s<0 distribution", col))
     }
   }
-  state
+  return(state)
 }
 
 .rule_composite <- function(row, state) {
@@ -120,7 +120,7 @@ box::use(
   } else if (v < -0.3) {
     state <- .add(state, -1L, sprintf("composite=%+.2f bearish", v))
   }
-  state
+  return(state)
 }
 
 RULES <- list(
@@ -166,5 +166,5 @@ derive_signals <- function(bars_with_features) {
       reasons = paste(state$reasons, collapse = "; ")
     )
   }
-  rbindlist(out)
+  return(rbindlist(out))
 }

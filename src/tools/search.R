@@ -1,5 +1,5 @@
 box::use(
-  ../searxng[ search ]
+  ../searxng[search]
 )
 
 #' @export

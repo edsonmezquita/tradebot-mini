@@ -1,11 +1,11 @@
-box::use(later, lubridate, data.table[ as.data.table, copy ])
+box::use(later, lubridate, data.table[as.data.table, copy])
 
 #' @export
 setInterval <- function(fun, interval = 60) {
   handle <- later$later(
     function() {
       setInterval(fun, interval)
-      fun()
+      return(fun())
     },
     interval
   )
@@ -31,11 +31,11 @@ format_dt_md <- function(dt, digits = 4L) {
   rows <- vapply(
     seq_len(nrow(dt)),
     function(i) {
-      paste0("| ", paste(as.character(unlist(dt[i])), collapse = " | "), " |")
+      return(paste0("| ", paste(as.character(unlist(dt[i])), collapse = " | "), " |"))
     },
     character(1)
   )
-  paste(c(hdr, sep, rows), collapse = "\n")
+  return(paste(c(hdr, sep, rows), collapse = "\n"))
 }
 
 #' @export

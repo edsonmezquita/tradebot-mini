@@ -1,6 +1,6 @@
 box::use(
   httr2,
-  jsonlite[ toJSON ]
+  jsonlite[toJSON]
 )
 
 # Rough char-to-token ratio. Truncate to ~3000 tokens ≈ 12000 chars.

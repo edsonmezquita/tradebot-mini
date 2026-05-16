@@ -1,8 +1,8 @@
 box::use(
-  jsonlite[ fromJSON ],
-  ../scrape[ scrape ],
-  ../deepseek[ ask ],
-  ../db[ scraped_pages_get, scraped_pages_put ]
+  jsonlite[fromJSON],
+  ../scrape[scrape],
+  ../deepseek[ask],
+  ../db[scraped_pages_get, scraped_pages_put]
 )
 
 #' @export
@@ -51,10 +51,10 @@ TOOL_SCRAPE_URL <- list(
     json = TRUE,
     max_tokens = 500
   )
-  tryCatch(
+  return(tryCatch(
     fromJSON(judgement_raw),
     error = function(e) list(usable = TRUE, reason = "grader-failed-defaulting-true")
-  )
+  ))
 }
 
 #' @export
@@ -64,8 +64,7 @@ handle_scrape_url <- function(args) {
   # the target or DeepSeek.
   hit <- scraped_pages_get(args$url, ttl_days = 7)
   if (!is.null(hit)) {
-    cat(sprintf("  [scrape cache] HIT url=%s age=%.1fd usable=%s\n",
-                args$url, hit$age_days, hit$grade_usable))
+    cat(sprintf("  [scrape cache] HIT url=%s age=%.1fd usable=%s\n", args$url, hit$age_days, hit$grade_usable))
     if (isTRUE(hit$grade_usable)) {
       return(hit$content)
     }
@@ -78,8 +77,8 @@ handle_scrape_url <- function(args) {
   }
   grade <- .grade_content(content)
   scraped_pages_put(
-    url          = args$url,
-    content      = content,
+    url = args$url,
+    content = content,
     grade_usable = isTRUE(grade$usable),
     grade_reason = as.character(grade$reason)
   )

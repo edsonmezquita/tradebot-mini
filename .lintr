@@ -1,11 +1,17 @@
 linters: linters_with_defaults(
+    defaults = box.linters::box_default_linters,
     line_length_linter = line_length_linter(120),
     indentation_linter = indentation_linter(2),
     return_linter = return_linter(return_style = "explicit"),
-    object_name_linter = object_name_linter(styles = c("snake_case", "SNAKE_CASE", "CamelCase"))
+    object_name_linter = object_name_linter(styles = c("snake_case", "SNAKE_CASE", "CamelCase", "camelCase")),
+    unused_declared_object_linter = NULL
   )
 exclusions: list(
     "renv/activate.R",
     "packages/*/renv/",
-    "scripts/"
+    "scripts/",
+    "db/migrations/",
+    "terraform/",
+    "crawl4ai/",
+    "searxng/"
   )

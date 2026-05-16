@@ -1,6 +1,6 @@
 box::use(
   httr2,
-  jsonlite[ toJSON ]
+  jsonlite[toJSON, fromJSON]
 )
 
 # ---- internal -------------------------------------------------------------
@@ -47,14 +47,14 @@ extract_tool_results <- function(messages) {
   if (length(tool_msgs) == 0L) {
     return("")
   }
-  paste(
+  return(paste(
     vapply(
       tool_msgs,
       function(m) paste0("[tool result]\n", as.character(m$content)),
       character(1)
     ),
     collapse = "\n\n"
-  )
+  ))
 }
 
 #' One-shot structured-output via tool calling.
@@ -109,7 +109,7 @@ ask_for_args <- function(
   if (!nzchar(raw_args)) {
     return(list())
   }
-  return(jsonlite::fromJSON(raw_args, simplifyVector = FALSE))
+  return(fromJSON(raw_args, simplifyVector = FALSE))
 }
 
 #' Call the DeepSeek chat completions API.
@@ -261,7 +261,7 @@ ask_with_tools <- function(
       name <- call$`function`$name
       raw_args <- call$`function`$arguments
       args <- if (nzchar(raw_args)) {
-        jsonlite::fromJSON(raw_args, simplifyVector = FALSE)
+        fromJSON(raw_args, simplifyVector = FALSE)
       } else {
         list()
       }

@@ -1,12 +1,5 @@
 box::use(
-  alpaca[
-    get_api_keys,
-    get_base_url,
-    get_data_base_url,
-    AlpacaMarketData,
-    AlpacaAccount,
-    AlpacaTrading
-  ]
+  alpaca[get_api_keys, get_base_url, get_data_base_url, AlpacaMarketData, AlpacaAccount, AlpacaTrading]
 )
 
 KEYS <- get_api_keys()

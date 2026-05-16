@@ -1,6 +1,6 @@
 box::use(
   httr2,
-  data.table[ data.table, rbindlist ]
+  data.table[data.table, rbindlist]
 )
 
 #' Query a SearXNG instance and return results as a data.table.
@@ -55,12 +55,12 @@ search <- function(
 
   return(rbindlist(
     lapply(body$results, function(r) {
-      list(
+      return(list(
         title = if (is.null(r$title)) NA_character_ else r$title,
         url = if (is.null(r$url)) NA_character_ else r$url,
         content = if (is.null(r$content)) NA_character_ else r$content,
         engine = if (is.null(r$engine)) NA_character_ else r$engine
-      )
+      ))
     }),
     fill = TRUE
   ))

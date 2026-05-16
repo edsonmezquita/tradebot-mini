@@ -1,10 +1,10 @@
 box::use(
   httr2,
-  digest[ hmac ],
-  jsonlite[ toJSON, base64_enc ],
-  data.table[ as.data.table, data.table, rbindlist ],
-  utils[ URLencode ],
-  ./db[ twitter_state_load, twitter_state_save ]
+  digest[hmac],
+  jsonlite[toJSON, base64_enc],
+  data.table[as.data.table, data.table, rbindlist],
+  utils[URLencode],
+  ./db[twitter_state_load, twitter_state_save]
 )
 
 # ---- OAuth 1.0a signing ----------------------------------------------------
@@ -43,19 +43,19 @@ box::use(
   oauth$oauth_signature <- base64_enc(
     hmac(signing_key, base_string, algo = "sha1", raw = TRUE)
   )
-  paste0(
+  return(paste0(
     "OAuth ",
     paste(
       vapply(
         names(oauth),
         function(k) {
-          paste0(.enc(k), '="', .enc(oauth[[k]]), '"')
+          return(paste0(.enc(k), '="', .enc(oauth[[k]]), '"'))
         },
         character(1)
       ),
       collapse = ", "
     )
-  )
+  ))
 }
 
 # ---- helpers ---------------------------------------------------------------
@@ -74,10 +74,10 @@ box::use(
     req <- httr2$req_url_query(req, !!!query_params)
   }
   resp <- httr2$req_perform(req)
-  list(
+  return(list(
     status = httr2$resp_status(resp),
     body = httr2$resp_body_json(resp, simplifyVector = FALSE)
-  )
+  ))
 }
 
 .get_signed <- function(url, query_params = list()) {
@@ -94,10 +94,10 @@ box::use(
     req <- httr2$req_url_query(req, !!!query_params)
   }
   resp <- httr2$req_perform(req)
-  list(
+  return(list(
     status = httr2$resp_status(resp),
     body = httr2$resp_body_json(resp, simplifyVector = FALSE)
-  )
+  ))
 }
 
 # ---- public API ------------------------------------------------------------
@@ -122,12 +122,12 @@ post_tweet <- function(text, in_reply_to_tweet_id = NULL) {
       error_message = NA_character_
     ))
   }
-  list(
+  return(list(
     success = FALSE,
     id = NA_character_,
     text = text,
     error_message = sprintf("HTTP %d: %s", res$status, toJSON(res$body, auto_unbox = TRUE))
-  )
+  ))
 }
 
 #' Look up the authenticated user's id + handle.
@@ -138,11 +138,11 @@ get_me <- function() {
   if (res$status != 200L) {
     stop(sprintf("get_me HTTP %d: %s", res$status, toJSON(res$body, auto_unbox = TRUE)))
   }
-  list(
+  return(list(
     id = res$body$data$id,
     username = res$body$data$username,
     name = res$body$data$name
-  )
+  ))
 }
 
 #' Read recent @-mentions of a user.
@@ -169,31 +169,31 @@ get_mentions <- function(user_id, since_id = NULL, max_results = 20L) {
   if (is.null(data) || length(data) == 0L) {
     return(data.table())
   }
-  rbindlist(
+  return(rbindlist(
     lapply(data, function(t) {
-      list(
+      return(list(
         id = t$id,
         text = t$text,
         author_id = t$author_id,
         conversation_id = t$conversation_id,
         created_at = t$created_at
-      )
+      ))
     }),
     fill = TRUE
-  )
+  ))
 }
 
 #' Load persisted Twitter state from the DB.
 #' @export
 load_twitter_state <- function() {
-  twitter_state_load()
+  return(twitter_state_load())
 }
 
 #' Persist Twitter state. Pass any subset of fields to merge into existing state.
 #' @export
 save_twitter_state <- function(...) {
   twitter_state_save(...)
-  invisible(twitter_state_load())
+  return(invisible(twitter_state_load()))
 }
 
 #' Read replies to a specific tweet (via conversation_id search).
@@ -217,15 +217,15 @@ get_replies_to <- function(tweet_id) {
   if (is.null(data) || length(data) == 0L) {
     return(data.table())
   }
-  rbindlist(
+  return(rbindlist(
     lapply(data, function(t) {
-      list(
+      return(list(
         id = t$id,
         text = t$text,
         author_id = t$author_id,
         created_at = t$created_at
-      )
+      ))
     }),
     fill = TRUE
-  )
+  ))
 }

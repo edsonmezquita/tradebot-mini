@@ -1,8 +1,8 @@
 box::use(
   hpfi,
-  data.table[ as.data.table, setorder, copy, fifelse ],
-  stats[ lm, coef ],
-  utils[ tail ]
+  data.table[as.data.table, setorder, copy, fifelse],
+  stats[lm, coef],
+  utils[tail]
 )
 
 # ---- helpers ---------------------------------------------------------------
@@ -12,11 +12,13 @@ box::use(
   }
   return(gsub("\\.", "p", as.character(x)))
 }
-.tag_join <- function(...) paste(vapply(list(...), .tag, character(1)), collapse = "_")
+.tag_join <- function(...) {
+  return(paste(vapply(list(...), .tag, character(1)), collapse = "_"))
+}
 
 .arg <- function(spec, name, default) {
   v <- spec[[name]]
-  if (is.null(v)) default else v
+  return(if (is.null(v)) default else v)
 }
 
 # Rolling slope of a numeric vector over a window (least-squares fit on
@@ -34,7 +36,7 @@ box::use(
       out[i] <- unname(coef(lm(y ~ xs))[2])
     }
   }
-  out
+  return(out)
 }
 
 # ---- one function per indicator -------------------------------------------
@@ -208,7 +210,7 @@ FEATURE_REGISTRY <- list(
 #' Render FEATURE_REGISTRY as a model/human-readable menu string.
 #' @export
 format_feature_menu <- function() {
-  paste(
+  return(paste(
     vapply(
       names(FEATURE_REGISTRY),
       function(n) {
@@ -225,12 +227,12 @@ format_feature_menu <- function() {
             collapse = ", "
           )
         }
-        sprintf("- %s [defaults: %s]: %s", n, p, e$description)
+        return(sprintf("- %s [defaults: %s]: %s", n, p, e$description))
       },
       character(1)
     ),
     collapse = "\n"
-  )
+  ))
 }
 
 #' Compute features and ADD them as columns to bars (via `:=`).
@@ -271,5 +273,5 @@ compute_features <- function(bars, features) {
 latest_per_symbol <- function(bars_with_features) {
   bf <- as.data.table(bars_with_features)
   setorder(bf, symbol, timestamp)
-  bf[, tail(.SD, 1L), by = symbol]
+  return(bf[, tail(.SD, 1L), by = symbol])
 }

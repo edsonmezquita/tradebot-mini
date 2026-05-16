@@ -1,5 +1,5 @@
 box::use(
-  ../features[ FEATURE_REGISTRY, format_feature_menu ]
+  ../features[FEATURE_REGISTRY, format_feature_menu]
 )
 
 #' `ask_for_args` style — model picks indicator specs, R runs them
@@ -55,7 +55,10 @@ TOOL_COMPUTE_FEATURES <- list(
         ),
         rationale = list(
           type = "string",
-          description = "One short paragraph: why these indicators and these parameters for these names and this horizon."
+          description = paste(
+            "One short paragraph: why these indicators and these parameters",
+            "for these names and this horizon."
+          )
         )
       ),
       required = list("features", "rationale")
