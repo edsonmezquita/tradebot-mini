@@ -1,0 +1,29 @@
+name: deploy-prod
+
+# Fires on a published GitHub Release. workflow_dispatch is the escape
+# hatch for redeploying a specific SHA without cutting a fresh release.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to deploy (default: latest ref)'
+        required: false
+        type: string
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy.yml
+    with:
+      ref: ${{ inputs.ref || '' }}
+    secrets: inherit

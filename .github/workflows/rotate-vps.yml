@@ -1,0 +1,80 @@
+name: rotate-vps
+
+# Manual IP rotation for the prod Nanode. Use when the app's outbound
+# IPv4 has been rate-limited / blocklisted (most common trigger:
+# scraper egress getting banned).
+#
+# Flow:
+#   1. `terraform taint linode_instance.prod_nanode` in terraform/prod/
+#   2. Dispatch deploy-prod.yml — next infra apply destroys + recreates
+#      the Nanode (fresh IPv4) and redeploys the bot.
+#
+# Downtime: ~2-3 min (boot + cloud-init + compose up). State survives
+# because everything lives in the shared managed Postgres.
+#
+# Safety: `confirm` input must equal "rotate" or the job aborts before
+# any state is mutated. workflow_dispatch only.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "rotate" to confirm prod Nanode replacement'
+        required: true
+        type: string
+
+concurrency:
+  group: rotate-vps
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  taint-and-dispatch:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Confirm
+        if: inputs.confirm != 'rotate'
+        run: |
+          echo "::error::confirm input must be exactly 'rotate' (got '${{ inputs.confirm }}')"
+          exit 1
+
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.14.9'
+          terraform_wrapper: false
+
+      - name: Terraform init + taint
+        env:
+          TF_BACKEND_BUCKET: ${{ secrets.TF_BACKEND_BUCKET }}
+          TF_BACKEND_ENDPOINT: ${{ secrets.TF_BACKEND_ENDPOINT }}
+          TF_BACKEND_REGION: ${{ secrets.TF_BACKEND_REGION }}
+          TF_BACKEND_ACCESS_KEY: ${{ secrets.TF_BACKEND_ACCESS_KEY }}
+          TF_BACKEND_SECRET_KEY: ${{ secrets.TF_BACKEND_SECRET_KEY }}
+          AWS_REQUEST_CHECKSUM_CALCULATION: WHEN_REQUIRED
+          AWS_RESPONSE_CHECKSUM_VALIDATION: WHEN_REQUIRED
+        working-directory: terraform/prod
+        run: |
+          set -euo pipefail
+          terraform init -reconfigure \
+            -backend-config="bucket=$TF_BACKEND_BUCKET" \
+            -backend-config="endpoints={\"s3\":\"$TF_BACKEND_ENDPOINT\"}" \
+            -backend-config="region=$TF_BACKEND_REGION" \
+            -backend-config="access_key=$TF_BACKEND_ACCESS_KEY" \
+            -backend-config="secret_key=$TF_BACKEND_SECRET_KEY" \
+            -backend-config="key=apps/tradebot-mini/prod.tfstate"
+          terraform taint linode_instance.prod_nanode || true
+
+      - name: Dispatch deploy-prod
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run deploy-prod.yml \
+            --repo ${{ github.repository }} \
+            --ref ${{ github.ref_name }}
+          echo "deploy-prod dispatched — watch the Actions tab"

@@ -1,0 +1,208 @@
+name: _deploy
+
+# Reusable deploy mechanics. Not triggered directly — deploy-prod.yml calls
+# it via `uses:`. Project-specific env rendering lives in
+# scripts/deploy/build-env.sh.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: false
+        default: ''
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/dereckscompany/tradebot-mini
+
+jobs:
+  infra:
+    runs-on: ubuntu-latest
+    environment: prod
+    outputs:
+      nanode_ip: ${{ steps.tf.outputs.nanode_ip }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.14.9'
+          terraform_wrapper: false
+
+      - name: Preflight — required infra secrets
+        env:
+          LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+          LINODE_SSH_KEY_PRIVATE: ${{ secrets.LINODE_SSH_KEY_PRIVATE }}
+          LINODE_VPC_SUBNET_ID: ${{ secrets.LINODE_VPC_SUBNET_ID }}
+          TF_BACKEND_BUCKET: ${{ secrets.TF_BACKEND_BUCKET }}
+          TF_BACKEND_ENDPOINT: ${{ secrets.TF_BACKEND_ENDPOINT }}
+          TF_BACKEND_REGION: ${{ secrets.TF_BACKEND_REGION }}
+          TF_BACKEND_ACCESS_KEY: ${{ secrets.TF_BACKEND_ACCESS_KEY }}
+          TF_BACKEND_SECRET_KEY: ${{ secrets.TF_BACKEND_SECRET_KEY }}
+        run: |
+          set -e
+          fail=0
+          check() { [ -n "${!1:-}" ] || { echo "❌ missing: $1"; fail=1; }; }
+          check LINODE_TOKEN
+          check LINODE_SSH_KEY_PRIVATE
+          check LINODE_VPC_SUBNET_ID
+          check TF_BACKEND_BUCKET
+          check TF_BACKEND_ENDPOINT
+          check TF_BACKEND_REGION
+          check TF_BACKEND_ACCESS_KEY
+          check TF_BACKEND_SECRET_KEY
+          [ "$fail" -eq 0 ] || exit 1
+
+      - id: tf
+        name: Terraform apply (prod infra)
+        timeout-minutes: 10
+        env:
+          TF_BACKEND_BUCKET: ${{ secrets.TF_BACKEND_BUCKET }}
+          TF_BACKEND_ENDPOINT: ${{ secrets.TF_BACKEND_ENDPOINT }}
+          TF_BACKEND_REGION: ${{ secrets.TF_BACKEND_REGION }}
+          TF_BACKEND_ACCESS_KEY: ${{ secrets.TF_BACKEND_ACCESS_KEY }}
+          TF_BACKEND_SECRET_KEY: ${{ secrets.TF_BACKEND_SECRET_KEY }}
+          TF_VAR_linode_token: ${{ secrets.LINODE_TOKEN }}
+          TF_VAR_vpc_subnet_id: ${{ secrets.LINODE_VPC_SUBNET_ID }}
+          AWS_REQUEST_CHECKSUM_CALCULATION: WHEN_REQUIRED
+          AWS_RESPONSE_CHECKSUM_VALIDATION: WHEN_REQUIRED
+          TF_LOG_PROVIDER: INFO
+        working-directory: terraform/prod
+        run: |
+          set -euo pipefail
+          terraform init -reconfigure \
+            -backend-config="bucket=$TF_BACKEND_BUCKET" \
+            -backend-config="endpoints={\"s3\":\"$TF_BACKEND_ENDPOINT\"}" \
+            -backend-config="region=$TF_BACKEND_REGION" \
+            -backend-config="access_key=$TF_BACKEND_ACCESS_KEY" \
+            -backend-config="secret_key=$TF_BACKEND_SECRET_KEY" \
+            -backend-config="key=apps/tradebot-mini/prod.tfstate"
+          terraform apply -auto-approve -input=false
+          IP=$(terraform output -raw prod_nanode_ip)
+          echo "nanode_ip=$IP" >> "$GITHUB_OUTPUT"
+          echo "prod Nanode IP: $IP"
+
+  build:
+    needs: [infra]
+    if: ${{ always() && needs.infra.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        env:
+          REF_INPUT: ${{ inputs.ref }}
+        run: |
+          REF="${{ github.event.release.tag_name }}"
+          REF="${REF:-${REF_INPUT:-${{ github.ref_name }}}}"
+          REF_CLEAN=$(echo "$REF" | tr '/' '-' | tr -cd 'a-zA-Z0-9._-')
+          SHA=$(git rev-parse --short HEAD)
+          IMAGE_TAG="prod-${REF_CLEAN}"
+          {
+            echo "image=${IMAGE}:${IMAGE_TAG}"
+            echo "tags=${IMAGE}:prod-latest,${IMAGE}:${IMAGE_TAG},${IMAGE}:prod-${SHA}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Ensure GHCR package exists
+        run: |
+          set -e
+          docker pull alpine:3.19 >/dev/null
+          docker tag alpine:3.19 "${IMAGE}:init"
+          docker push "${IMAGE}:init"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # GITHUB_TOKEN can read repos in the org GHCR is on, including
+          # the private hpfi package fetched by renv::restore at build time.
+          secrets: |
+            github_token=${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    needs: [infra, build]
+    if: ${{ always() && needs.build.result == 'success' && needs.infra.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      SERVER_IMAGE: ${{ needs.build.outputs.image }}
+      HOST: ${{ needs.infra.outputs.nanode_ip }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.LINODE_SSH_KEY_PRIVATE }}
+
+      - name: Wait for cloud-init
+        run: |
+          SSH_OPTS="-o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=5"
+          for i in $(seq 1 60); do
+            if ssh $SSH_OPTS "root@${HOST}" \
+                 'cloud-init status --wait >/dev/null 2>&1 && docker info >/dev/null 2>&1'; then
+              echo "Nanode ready"
+              exit 0
+            fi
+            echo "waiting for cloud-init ($i/60)"
+            sleep 10
+          done
+          echo "::error::Nanode did not become ready in 10 minutes"
+          exit 1
+
+      - name: Render env
+        env:
+          SECRETS_JSON: ${{ toJSON(secrets) }}
+        run: |
+          set -euo pipefail
+          bash scripts/deploy/build-env.sh prod /tmp/env.env
+          echo "--- env file summary (lengths only) ---"
+          awk -F= '/^[A-Z]/{ printf "%-30s len=%d\n", $1, length($0)-length($1)-1 }' /tmp/env.env
+
+      - name: Deploy
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-o StrictHostKeyChecking=accept-new -o BatchMode=yes"
+          APP_DIR=/opt/app
+          COMPOSE_PROJECT=tradebot-mini
+
+          # SCP compose file, searxng config dir, and rendered .env.
+          scp $SSH_OPTS docker-compose.prod.yml      "root@${HOST}:${APP_DIR}/docker-compose.yml"
+          scp $SSH_OPTS searxng/settings.yml         "root@${HOST}:${APP_DIR}/searxng/settings.yml"
+          scp $SSH_OPTS /tmp/env.env                 "root@${HOST}:${APP_DIR}/.env"
+
+          # Pull the new image + (re)start long-running sidecars. The
+          # tradebot service has profile=manual so `up -d` skips it; host
+          # cron fires it daily via `docker compose run --rm tradebot`.
+          ssh $SSH_OPTS "root@${HOST}" bash -s <<REMOTE
+          set -euo pipefail
+          chmod 600 ${APP_DIR}/.env
+          echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USER}' --password-stdin
+          cd ${APP_DIR}
+          COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT} docker compose --env-file .env pull
+          COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT} docker compose --env-file .env up -d --remove-orphans
+          docker image prune -f
+          REMOTE
+
+          echo "deploy complete on ${HOST}"

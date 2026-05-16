@@ -1,0 +1,42 @@
+#cloud-config
+# Prod Nanode for tradebot-mini.
+#   - Installs Docker
+#   - Sets timezone to America/New_York so cron times match market hours
+#   - Creates /opt/app for compose files + .env (deploy workflow scps into it)
+#   - Installs the daily cron entry that fires the bot
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - ufw
+  - fail2ban
+  - tzdata
+
+timezone: America/New_York
+
+runcmd:
+  - curl -fsSL https://get.docker.com | sh
+  - ufw allow 22/tcp
+  - ufw --force enable
+  - systemctl enable --now fail2ban
+  - mkdir -p /opt/app/searxng /opt/app/logs
+  - chmod 700 /opt/app
+  # Three cycles per US trading day, all Mon-Fri only:
+  #   10:00 ET — 30 min after open (settle from open volatility)
+  #   13:00 ET — midday (~midpoint of 9:30-16:00 session)
+  #   15:00 ET — one hour before close (final repositioning window)
+  # main.R short-circuits on US market holidays via Alpaca's calendar
+  # endpoint, so weekday filter is enough — no holiday list needed here.
+  - |
+    cat > /etc/cron.d/tradebot <<'EOF'
+    SHELL=/bin/bash
+    PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+    CRON_TZ=America/New_York
+    0 10 * * 1-5 root cd /opt/app && /usr/bin/docker compose --env-file .env --profile manual run --rm tradebot >> /opt/app/logs/cycle-$(date +\%Y\%m\%d-\%H\%M).log 2>&1
+    0 13 * * 1-5 root cd /opt/app && /usr/bin/docker compose --env-file .env --profile manual run --rm tradebot >> /opt/app/logs/cycle-$(date +\%Y\%m\%d-\%H\%M).log 2>&1
+    0 15 * * 1-5 root cd /opt/app && /usr/bin/docker compose --env-file .env --profile manual run --rm tradebot >> /opt/app/logs/cycle-$(date +\%Y\%m\%d-\%H\%M).log 2>&1
+    EOF
+  - chmod 644 /etc/cron.d/tradebot

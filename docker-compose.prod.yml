@@ -1,0 +1,45 @@
+# Prod Nanode — three services on one network.
+#   - searxng + crawl4ai run 24/7 (sidecars the bot calls into)
+#   - tradebot is `profile: manual` so `docker compose up -d` doesn't start
+#     it; host cron fires it daily via `docker compose run --rm tradebot`.
+
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: tradebot-searxng
+    restart: unless-stopped
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080/
+      - INSTANCE_NAME=tradebot-searxng
+      - SEARXNG_SECRET=${SEARXNG_SECRET}
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    networks:
+      - appnet
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID]
+
+  crawl4ai:
+    image: unclecode/crawl4ai:latest
+    container_name: tradebot-crawl4ai
+    restart: unless-stopped
+    shm_size: "1gb"
+    networks:
+      - appnet
+
+  tradebot:
+    image: ${SERVER_IMAGE}
+    container_name: tradebot-mini
+    profiles: ["manual"]
+    env_file: .env
+    environment:
+      - SEARXNG_URL=http://searxng:8080
+      - CRAWL4AI_URL=http://crawl4ai:11235
+    networks:
+      - appnet
+    depends_on:
+      - searxng
+      - crawl4ai
+
+networks:
+  appnet:

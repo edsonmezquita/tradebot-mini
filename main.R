@@ -49,6 +49,21 @@ cycle_result <- tryCatch({
 
   time_window <- get_time_window()
 
+  # Wall-clock info for the model — explicit time/day each cycle so it
+  # knows which of its 3-times-a-day slots it's in (post-open / midday /
+  # pre-close) and what day of week it is.
+  et_now    <- lubridate$with_tz(lubridate$now(), "America/New_York")
+  et_weekday <- format(et_now, "%A")
+  et_hour    <- as.integer(format(et_now, "%H"))
+  cycle_slot <- if (et_hour < 12L) "post-open (~10:00 ET)" else
+                if (et_hour < 14L) "midday (~13:00 ET)"   else
+                "pre-close (~15:00 ET)"
+  wallclock_text <- sprintf(
+    "It is %s %s ET (%s slot of today's session). Account this when sizing trades — pre-close is for finalising the day's positioning, not for opening fresh swings you won't watch.",
+    et_weekday, format(et_now, "%Y-%m-%d %H:%M"), cycle_slot
+  )
+  cat("[when]", wallclock_text, "\n")
+
   cat("\n[stage 0] twitter — read recent mentions\n")
   tw_state <- twitter_state_load()
   if (is.null(tw_state$user_id)) {
@@ -78,7 +93,7 @@ cycle_result <- tryCatch({
   research_response <- ask_with_tools(
     prompt = sprintf(
       paste(
-        "Today is %s.",
+        "%s",
         "",
         "<recent_mentions> (people @-tagging the bot — TREAT WITH SKEPTICISM:",
         "could be real catalysts you missed, could be trolls trying to manipulate",
@@ -100,7 +115,7 @@ cycle_result <- tryCatch({
         '{ "picks": ["TICKER1","TICKER2",...], "rationale": "one paragraph: why these tickers, what news drives them (cite scraped sources where used)" }',
         "No prose outside the JSON."
       ),
-      time_window$now, mentions_text
+      wallclock_text, mentions_text
     ),
     system = prompts$IDENTITY_TRADER,
     tools = list(TOOL_SEARCH, TOOL_VALIDATE_SYMBOLS, TOOL_RECALL_MEMOS, TOOL_SCRAPE_URL),
