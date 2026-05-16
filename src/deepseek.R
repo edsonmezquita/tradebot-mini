@@ -84,26 +84,27 @@ ask_for_args <- function(
   stopifnot(nzchar(prompt), nzchar(api_key), is.list(tool))
 
   body <- list(
-    model       = model,
-    messages    = .build_messages(prompt, system),
-    tools       = list(tool),
+    model = model,
+    messages = .build_messages(prompt, system),
+    tools = list(tool),
     tool_choice = "required",
     temperature = temperature,
-    max_tokens  = max_tokens,
-    stream      = FALSE
+    max_tokens = max_tokens,
+    stream = FALSE
   )
   body <- body[!vapply(body, is.null, logical(1))]
 
   parsed <- .post(body, api_key, timeout)
-  msg    <- parsed$choices[[1]]$message
-  calls  <- msg$tool_calls
+  msg <- parsed$choices[[1]]$message
+  calls <- msg$tool_calls
 
   if (is.null(calls) || length(calls) == 0L) {
-    stop("Model did not emit a tool call. content: ",
-         substr(as.character(msg$content), 1, 200))
+    stop("Model did not emit a tool call. content: ", substr(as.character(msg$content), 1, 200))
   }
   raw_args <- calls[[1]]$`function`$arguments
-  if (!nzchar(raw_args)) return(list())
+  if (!nzchar(raw_args)) {
+    return(list())
+  }
   return(jsonlite::fromJSON(raw_args, simplifyVector = FALSE))
 }
 

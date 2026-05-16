@@ -151,18 +151,18 @@ TOOL_COMPUTE_FEATURES <- list(
                 description = "Indicator name from the menu.",
                 enum = as.list(names(FEATURE_REGISTRY))
               ),
-              period     = list(type = "integer", description = "Lookback period (rsi/atr/bbands/supertrend)"),
-              sd         = list(type = "number",  description = "Std-dev multiplier (bbands)"),
-              fast       = list(type = "integer", description = "Fast period (macd)"),
-              slow       = list(type = "integer", description = "Slow period (macd)"),
-              signal     = list(type = "integer", description = "Signal smoothing period (macd)"),
-              multiplier = list(type = "number",  description = "ATR multiplier (supertrend)"),
-              periods    = list(
+              period = list(type = "integer", description = "Lookback period (rsi/atr/bbands/supertrend)"),
+              sd = list(type = "number", description = "Std-dev multiplier (bbands)"),
+              fast = list(type = "integer", description = "Fast period (macd)"),
+              slow = list(type = "integer", description = "Slow period (macd)"),
+              signal = list(type = "integer", description = "Signal smoothing period (macd)"),
+              multiplier = list(type = "number", description = "ATR multiplier (supertrend)"),
+              periods = list(
                 type = "array",
                 items = list(type = "integer"),
                 description = "List of EMA periods. Multiple periods also yield ema_cross_<short>_<long> signals."
               ),
-              window     = list(type = "integer", description = "Slope window (obv_slope)")
+              window = list(type = "integer", description = "Slope window (obv_slope)")
             ),
             required = list("name")
           )
@@ -182,14 +182,18 @@ TOOL_COMPUTE_FEATURES <- list(
 # ============================================================================
 handle_search <- function(args) {
   language <- args$language
-  if (is.null(language) || !nzchar(language)) language <- "all"
+  if (is.null(language) || !nzchar(language)) {
+    language <- "all"
+  }
   res <- search(
-    query    = args$query,
-    engines  = args$engines,
+    query = args$query,
+    engines = args$engines,
     language = language,
-    pageno   = 1
+    pageno = 1
   )
-  if (nrow(res) > 10) res <- res[seq_len(10)]
+  if (nrow(res) > 10) {
+    res <- res[seq_len(10)]
+  }
   return(res)
 }
 
@@ -200,6 +204,6 @@ handle_validate_symbols <- function(args) {
 
 #' @export
 TOOL_HANDLERS <- list(
-  search           = handle_search,
+  search = handle_search,
   validate_symbols = handle_validate_symbols
 )

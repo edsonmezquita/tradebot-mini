@@ -25,7 +25,9 @@ setInterval(
     time_window <- get_time_window()
     cat(sprintf(
       "\n========== iteration %i  %s - %s ==========\n",
-      iteration, time_window$then, time_window$now
+      iteration,
+      time_window$then,
+      time_window$now
     ))
 
     cat("\n[stage 1] research\n")
@@ -70,7 +72,8 @@ setInterval(
       cat(sprintf("  retry %d/%d: all picks invalid, re-asking with prior news\n", attempt, max_retries))
       retry_response <- ask(
         prompt = paste(
-          "Earlier news searches returned the following results:\n\n", prior_news,
+          "Earlier news searches returned the following results:\n\n",
+          prior_news,
           "\n\nYour previous picks were ALL rejected — these are NOT tradable on Alpaca: ",
           paste(validation$invalid, collapse = ", "),
           "\n\nPick 2-4 DIFFERENT US-listed tickers from the news above that ARE tradable on",
@@ -97,25 +100,27 @@ setInterval(
         paste(research$picks, collapse = ", "),
         research$rationale
       ),
-      system     = prompts$IDENTITY_TRADER,
-      tool       = TOOL_GET_BARS_MULTI,
+      system = prompts$IDENTITY_TRADER,
+      tool = TOOL_GET_BARS_MULTI,
       max_tokens = 2000
     )
     cat(sprintf(
       "  symbols=%s  timeframe=%s  days=%s\n  rationale: %s\n",
       paste(unlist(bars_args$symbols), collapse = ","),
-      bars_args$timeframe, bars_args$days, bars_args$rationale
+      bars_args$timeframe,
+      bars_args$days,
+      bars_args$rationale
     ))
 
-    now  <- lubridate$now(tzone = "UTC")
+    now <- lubridate$now(tzone = "UTC")
     then <- now - lubridate$ddays(as.integer(bars_args$days))
-    fmt  <- function(t) format(t, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+    fmt <- function(t) format(t, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
     bars <- market$get_bars_multi(
-      symbols   = unlist(bars_args$symbols, use.names = FALSE),
+      symbols = unlist(bars_args$symbols, use.names = FALSE),
       timeframe = bars_args$timeframe,
-      start     = fmt(then),
-      end       = fmt(now),
-      feed      = "iex"
+      start = fmt(then),
+      end = fmt(now),
+      feed = "iex"
     )
     cat("  fetched", nrow(bars), "bars\n")
 
@@ -131,14 +136,17 @@ setInterval(
           "same indicator with different params is encouraged."
         ),
         paste(research$picks, collapse = ", "),
-        bars_args$timeframe, bars_args$days, nrow(bars),
+        bars_args$timeframe,
+        bars_args$days,
+        nrow(bars),
         research$rationale
       ),
-      system     = prompts$IDENTITY_TRADER,
-      tool       = TOOL_COMPUTE_FEATURES,
+      system = prompts$IDENTITY_TRADER,
+      tool = TOOL_COMPUTE_FEATURES,
       max_tokens = 3000
     )
-    cat("  specs chosen:\n"); str(feat_args$features)
+    cat("  specs chosen:\n")
+    str(feat_args$features)
     cat("  rationale:", feat_args$rationale, "\n")
 
     bars <- compute_features(bars, feat_args$features)
@@ -154,16 +162,18 @@ setInterval(
 
     decision_response <- ask(
       prompt = paste(
-        "News rationale (from your earlier research):\n", research$rationale,
+        "News rationale (from your earlier research):\n",
+        research$rationale,
         "\n\nLast 10 bars per symbol with the indicators YOU chose",
         "(parameter choices encoded in the column names):\n",
         recent_text,
-        "\n\nYour earlier rationale for the indicator parameters:\n", feat_args$rationale,
+        "\n\nYour earlier rationale for the indicator parameters:\n",
+        feat_args$rationale,
         "\n\nReply ONLY with JSON of the form:",
         '{ "decisions": [ { "ticker": "X", "action": "buy"|"sell"|"hold", "confidence": 0.0-1.0, "reason": "one sentence grounded in the table above" } ] }'
       ),
-      system     = prompts$IDENTITY_TRADER,
-      json       = TRUE,
+      system = prompts$IDENTITY_TRADER,
+      json = TRUE,
       max_tokens = 4000
     )
     decisions <- fromJSON(decision_response$content, simplifyDataFrame = TRUE)
@@ -174,7 +184,8 @@ setInterval(
     print(merge(
       signals[, list(symbol, prog_signal = signal, prog_score = score)],
       as.data.table(decisions$decisions)[, list(symbol = ticker, model_action = action, model_conf = confidence)],
-      by = "symbol", all = TRUE
+      by = "symbol",
+      all = TRUE
     ))
 
     iteration <<- iteration + 1
