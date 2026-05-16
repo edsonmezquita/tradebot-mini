@@ -41,8 +41,8 @@ TOOL_POST_TWEETS <- TOOL_POST_TWEETS
 #' Handlers for tools that participate in agentic loops.
 #' @export
 TOOL_HANDLERS <- list(
-  search           = handle_search,
+  search = handle_search,
   validate_symbols = handle_validate_symbols,
-  recall_memos     = handle_recall_memos,
-  scrape_url       = handle_scrape_url
+  recall_memos = handle_recall_memos,
+  scrape_url = handle_scrape_url
 )

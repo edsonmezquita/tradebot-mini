@@ -46,8 +46,8 @@ TOOL_SCRAPE_URL <- list(
       "--- scraped content ---",
       content
     ),
-    model      = "deepseek-v4-flash",
-    json       = TRUE,
+    model = "deepseek-v4-flash",
+    json = TRUE,
     max_tokens = 500
   )
   tryCatch(

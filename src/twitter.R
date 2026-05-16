@@ -11,19 +11,21 @@ box::use(
 
 .oauth1_header <- function(method, url, query_params = list(), body_form_params = list()) {
   oauth <- list(
-    oauth_consumer_key     = Sys.getenv("TWITTER_API_CONSUMER_KEY"),
-    oauth_nonce            = paste0(sample(c(0:9, letters), 32, replace = TRUE), collapse = ""),
+    oauth_consumer_key = Sys.getenv("TWITTER_API_CONSUMER_KEY"),
+    oauth_nonce = paste0(sample(c(0:9, letters), 32, replace = TRUE), collapse = ""),
     oauth_signature_method = "HMAC-SHA1",
-    oauth_timestamp        = as.character(as.integer(Sys.time())),
-    oauth_token            = Sys.getenv("TWITTER_ACCESS_TOKEN"),
-    oauth_version          = "1.0"
+    oauth_timestamp = as.character(as.integer(Sys.time())),
+    oauth_token = Sys.getenv("TWITTER_ACCESS_TOKEN"),
+    oauth_version = "1.0"
   )
   # OAuth 1.0a signs OAuth params + query params + (form body if any).
   # JSON bodies are NOT part of the signature.
   all_params <- c(oauth, query_params, body_form_params)
   pairs <- mapply(
     function(k, v) paste0(.enc(k), "=", .enc(v)),
-    names(all_params), all_params, USE.NAMES = FALSE
+    names(all_params),
+    all_params,
+    USE.NAMES = FALSE
   )
   pairs <- sort(pairs)
   base_string <- paste(
@@ -33,7 +35,8 @@ box::use(
     sep = "&"
   )
   signing_key <- paste0(
-    .enc(Sys.getenv("TWITTER_API_SECRET_KEY")), "&",
+    .enc(Sys.getenv("TWITTER_API_SECRET_KEY")),
+    "&",
     .enc(Sys.getenv("TWITTER_TOKEN_SECRET"))
   )
   oauth$oauth_signature <- base64_enc(
@@ -42,9 +45,13 @@ box::use(
   paste0(
     "OAuth ",
     paste(
-      vapply(names(oauth), function(k) {
-        paste0(.enc(k), '="', .enc(oauth[[k]]), '"')
-      }, character(1)),
+      vapply(
+        names(oauth),
+        function(k) {
+          paste0(.enc(k), '="', .enc(oauth[[k]]), '"')
+        },
+        character(1)
+      ),
       collapse = ", "
     )
   )
@@ -53,7 +60,9 @@ box::use(
 # ---- helpers ---------------------------------------------------------------
 .post_signed_json <- function(url, body_list, query_params = list()) {
   auth <- .oauth1_header(
-    method = "POST", url = url, query_params = query_params
+    method = "POST",
+    url = url,
+    query_params = query_params
   )
   req <- httr2$request(url) |>
     httr2$req_method("POST") |>
@@ -66,13 +75,15 @@ box::use(
   resp <- httr2$req_perform(req)
   list(
     status = httr2$resp_status(resp),
-    body   = httr2$resp_body_json(resp, simplifyVector = FALSE)
+    body = httr2$resp_body_json(resp, simplifyVector = FALSE)
   )
 }
 
 .get_signed <- function(url, query_params = list()) {
   auth <- .oauth1_header(
-    method = "GET", url = url, query_params = query_params
+    method = "GET",
+    url = url,
+    query_params = query_params
   )
   req <- httr2$request(url) |>
     httr2$req_method("GET") |>
@@ -84,7 +95,7 @@ box::use(
   resp <- httr2$req_perform(req)
   list(
     status = httr2$resp_status(resp),
-    body   = httr2$resp_body_json(resp, simplifyVector = FALSE)
+    body = httr2$resp_body_json(resp, simplifyVector = FALSE)
   )
 }
 
@@ -105,15 +116,15 @@ post_tweet <- function(text, in_reply_to_tweet_id = NULL) {
   if (res$status == 201L) {
     return(list(
       success = TRUE,
-      id      = res$body$data$id,
-      text    = res$body$data$text,
+      id = res$body$data$id,
+      text = res$body$data$text,
       error_message = NA_character_
     ))
   }
   list(
     success = FALSE,
-    id      = NA_character_,
-    text    = text,
+    id = NA_character_,
+    text = text,
     error_message = sprintf("HTTP %d: %s", res$status, toJSON(res$body, auto_unbox = TRUE))
   )
 }
@@ -127,9 +138,9 @@ get_me <- function() {
     stop(sprintf("get_me HTTP %d: %s", res$status, toJSON(res$body, auto_unbox = TRUE)))
   }
   list(
-    id       = res$body$data$id,
+    id = res$body$data$id,
     username = res$body$data$username,
-    name     = res$body$data$name
+    name = res$body$data$name
   )
 }
 
@@ -154,16 +165,21 @@ get_mentions <- function(user_id, since_id = NULL, max_results = 20L) {
     return(data.table())
   }
   data <- res$body$data
-  if (is.null(data) || length(data) == 0L) return(data.table())
-  rbindlist(lapply(data, function(t) {
-    list(
-      id              = t$id,
-      text            = t$text,
-      author_id       = t$author_id,
-      conversation_id = t$conversation_id,
-      created_at      = t$created_at
-    )
-  }), fill = TRUE)
+  if (is.null(data) || length(data) == 0L) {
+    return(data.table())
+  }
+  rbindlist(
+    lapply(data, function(t) {
+      list(
+        id = t$id,
+        text = t$text,
+        author_id = t$author_id,
+        conversation_id = t$conversation_id,
+        created_at = t$created_at
+      )
+    }),
+    fill = TRUE
+  )
 }
 
 .STATE_PATH <- "state/twitter_state.json"
@@ -172,7 +188,9 @@ get_mentions <- function(user_id, since_id = NULL, max_results = 20L) {
 #' Returns an empty list on first run.
 #' @export
 load_twitter_state <- function() {
-  if (!file.exists(.STATE_PATH)) return(list())
+  if (!file.exists(.STATE_PATH)) {
+    return(list())
+  }
   tryCatch(fromJSON(.STATE_PATH), error = function(e) list())
 }
 
@@ -181,7 +199,9 @@ load_twitter_state <- function() {
 save_twitter_state <- function(...) {
   current <- load_twitter_state()
   updates <- list(...)
-  for (k in names(updates)) current[[k]] <- updates[[k]]
+  for (k in names(updates)) {
+    current[[k]] <- updates[[k]]
+  }
   if (!dir.exists(dirname(.STATE_PATH))) {
     dir.create(dirname(.STATE_PATH), recursive = TRUE)
   }
@@ -207,13 +227,18 @@ get_replies_to <- function(tweet_id) {
     return(data.table())
   }
   data <- res$body$data
-  if (is.null(data) || length(data) == 0L) return(data.table())
-  rbindlist(lapply(data, function(t) {
-    list(
-      id         = t$id,
-      text       = t$text,
-      author_id  = t$author_id,
-      created_at = t$created_at
-    )
-  }), fill = TRUE)
+  if (is.null(data) || length(data) == 0L) {
+    return(data.table())
+  }
+  rbindlist(
+    lapply(data, function(t) {
+      list(
+        id = t$id,
+        text = t$text,
+        author_id = t$author_id,
+        created_at = t$created_at
+      )
+    }),
+    fill = TRUE
+  )
 }

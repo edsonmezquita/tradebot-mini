@@ -41,7 +41,10 @@ setInterval(
     }
     mentions <- tryCatch(
       get_mentions(user_id = tw_state$user_id, since_id = tw_state$last_mention_id),
-      error = function(e) { cat("  mentions fetch failed:", conditionMessage(e), "\n"); data.table::data.table() }
+      error = function(e) {
+        cat("  mentions fetch failed:", conditionMessage(e), "\n")
+        data.table::data.table()
+      }
     )
     cat("  ", nrow(mentions), " new mentions since last cycle\n", sep = "")
     if (nrow(mentions) > 0) {
@@ -277,22 +280,25 @@ setInterval(
 
     cat("\n[stage 6] persist memo\n")
     write_memo(
-      picks     = research$picks,
+      picks = research$picks,
       decisions = decisions,
-      memo      = decision_args$memo
+      memo = decision_args$memo
     )
     cat("  memo:", decision_args$memo, "\n")
 
     cat("\n[stage 7] post tweets\n")
     tw_state <- load_twitter_state()
-    hours_since_last <- if (is.null(tw_state$last_tweet_at)) Inf else {
-      as.numeric(difftime(lubridate$now(tzone = "UTC"),
-                          lubridate$ymd_hms(tw_state$last_tweet_at, tz = "UTC"),
-                          units = "hours"))
+    hours_since_last <- if (is.null(tw_state$last_tweet_at)) {
+      Inf
+    } else {
+      as.numeric(difftime(
+        lubridate$now(tzone = "UTC"),
+        lubridate$ymd_hms(tw_state$last_tweet_at, tz = "UTC"),
+        units = "hours"
+      ))
     }
     if (hours_since_last < 20) {
-      cat(sprintf("  skipping — last tweet was %.1f hours ago (<20h cost discipline)\n",
-                  hours_since_last))
+      cat(sprintf("  skipping — last tweet was %.1f hours ago (<20h cost discipline)\n", hours_since_last))
     } else {
       tweet_args <- ask_for_args(
         prompt = paste(
@@ -301,12 +307,26 @@ setInterval(
           ").\n\n<account_state>\n",
           sprintf("cash=$%.2f  equity=$%.2f  buying_power=$%.2f", acct$cash, acct$equity, acct$buying_power),
           "\n</account_state>\n\n<todays_decisions>\n",
-          paste(vapply(decisions, function(d) sprintf("- %s %s %s (conf %.2f): %s",
-                                                       d$ticker, d$action,
-                                                       if (is.null(d$notional)) "" else paste0("$", d$notional),
-                                                       d$confidence, d$reason),
-                       character(1)), collapse = "\n"),
-          "\n</todays_decisions>\n\n<your_memo>\n", decision_args$memo, "\n</your_memo>\n\n",
+          paste(
+            vapply(
+              decisions,
+              function(d) {
+                sprintf(
+                  "- %s %s %s (conf %.2f): %s",
+                  d$ticker,
+                  d$action,
+                  if (is.null(d$notional)) "" else paste0("$", d$notional),
+                  d$confidence,
+                  d$reason
+                )
+              },
+              character(1)
+            ),
+            collapse = "\n"
+          ),
+          "\n</todays_decisions>\n\n<your_memo>\n",
+          decision_args$memo,
+          "\n</your_memo>\n\n",
           "<recent_mentions> (candidates for reply — pick AT MOST 2 worth answering;",
           "ignore trolls/spam/low-effort. Skip entirely if none are interesting.)\n",
           mentions_text,
@@ -316,8 +336,8 @@ setInterval(
           "precise, slightly smug, occasional French. Include 'not financial advice'",
           "at least once across the batch."
         ),
-        system     = prompts$IDENTITY_TRADER,
-        tool       = TOOL_POST_TWEETS,
+        system = prompts$IDENTITY_TRADER,
+        tool = TOOL_POST_TWEETS,
         max_tokens = 3000
       )
       for (t in tweet_args$tweets) {
@@ -326,9 +346,12 @@ setInterval(
           in_reply_to_tweet_id = t$in_reply_to_tweet_id
         )
         if (result$success) {
-          cat(sprintf("  OK    %s [%s] %s\n",
-                      if (is.null(t$in_reply_to_tweet_id)) "STATUS" else "REPLY ",
-                      result$id, t$text))
+          cat(sprintf(
+            "  OK    %s [%s] %s\n",
+            if (is.null(t$in_reply_to_tweet_id)) "STATUS" else "REPLY ",
+            result$id,
+            t$text
+          ))
           if (is.null(t$in_reply_to_tweet_id)) {
             save_twitter_state(
               last_tweet_id = result$id,

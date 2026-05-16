@@ -11,7 +11,7 @@ box::use(
 #' @param memo one short factual paragraph from the model.
 #' @export
 write_memo <- function(picks, decisions, memo) {
-  buys  <- character()
+  buys <- character()
   sells <- character()
   holds <- character()
   for (d in decisions) {
@@ -26,11 +26,11 @@ write_memo <- function(picks, decisions, memo) {
 
   row <- data.table(
     timestamp = format(lubridate$now(tzone = "UTC"), "%Y-%m-%dT%H:%M:%SZ"),
-    picks     = paste(picks,  collapse = ","),
-    buys      = paste(buys,   collapse = ","),
-    sells     = paste(sells,  collapse = ","),
-    holds     = paste(holds,  collapse = ","),
-    memo      = memo
+    picks = paste(picks, collapse = ","),
+    buys = paste(buys, collapse = ","),
+    sells = paste(sells, collapse = ","),
+    holds = paste(holds, collapse = ","),
+    memo = memo
   )
 
   if (!dir.exists(dirname(.MEMOS_PATH))) {
@@ -49,28 +49,39 @@ write_memo <- function(picks, decisions, memo) {
 #' @return data.table (possibly empty).
 #' @export
 read_memos <- function(
-  limit  = 10L,
-  order  = "newest",
+  limit = 10L,
+  order = "newest",
   ticker = NULL,
-  since  = NULL,
-  until  = NULL
+  since = NULL,
+  until = NULL
 ) {
-  if (!file.exists(.MEMOS_PATH)) return(data.table())
+  if (!file.exists(.MEMOS_PATH)) {
+    return(data.table())
+  }
   m <- fread(.MEMOS_PATH)
-  if (nrow(m) == 0L) return(m)
+  if (nrow(m) == 0L) {
+    return(m)
+  }
 
   if (!is.null(ticker) && nzchar(ticker)) {
     pat <- paste0("(^|,)", toupper(ticker), "(:|,|$)")
     m <- m[
-      grepl(pat, picks) | grepl(pat, buys) |
-      grepl(pat, sells) | grepl(pat, holds)
+      grepl(pat, picks) | grepl(pat, buys) | grepl(pat, sells) | grepl(pat, holds)
     ]
   }
-  if (!is.null(since) && nzchar(since)) m <- m[timestamp >= since]
-  if (!is.null(until) && nzchar(until)) m <- m[timestamp <= until]
+  if (!is.null(since) && nzchar(since)) {
+    m <- m[timestamp >= since]
+  }
+  if (!is.null(until) && nzchar(until)) {
+    m <- m[timestamp <= until]
+  }
 
   setorder(m, timestamp)
-  if (order == "newest") m <- m[order(-timestamp)]
-  if (!is.null(limit) && nrow(m) > limit) m <- m[seq_len(limit)]
+  if (order == "newest") {
+    m <- m[order(-timestamp)]
+  }
+  if (!is.null(limit) && nrow(m) > limit) {
+    m <- m[seq_len(limit)]
+  }
   return(m)
 }

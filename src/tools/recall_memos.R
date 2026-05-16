@@ -50,10 +50,10 @@ handle_recall_memos <- function(args) {
   limit <- if (is.null(args$limit)) 10L else min(as.integer(args$limit), 100L)
   order <- if (is.null(args$order) || !nzchar(args$order)) "newest" else args$order
   read_memos(
-    limit  = limit,
-    order  = order,
+    limit = limit,
+    order = order,
     ticker = args$ticker,
-    since  = args$since,
-    until  = args$until
+    since = args$since,
+    until = args$until
   )
 }
