@@ -1,28 +1,12 @@
 box::use(
-  ./searxng[search],
-  ./alpaca[market],
-  ./features[compute_features, FEATURE_REGISTRY, format_feature_menu, latest_per_symbol],
-  lubridate
+  ./searxng[ search ],
+  ./features[ FEATURE_REGISTRY, format_feature_menu ],
+  ./universe[ validate_picks ]
 )
 
-# ---- bars cache ------------------------------------------------------------
-# Tools that produce large data (e.g. get_bars_multi) stash the result here
-# under a short id and return only the id + a small summary to the model.
-# A subsequent tool call (e.g. compute_features) references the data by id.
-# This keeps each step explicit AND avoids round-tripping huge OHLCV tables
-# through the model's JSON arguments.
-#
-# Inspect / mutate from R:
-#   ls(tools_state$bars)
-#   tools_state$bars$bars_abc123
-#' @export
-tools_state <- list(bars = new.env(parent = emptyenv()))
-
-.new_bars_id <- function() {
-  paste0("bars_", format(Sys.time(), "%H%M%S"), "_", sample.int(9999, 1))
-}
-
-# ---- TOOL: search ----------------------------------------------------------
+# ============================================================================
+# TOOL: search
+# ============================================================================
 #' @export
 TOOL_SEARCH <- list(
   type = "function",
@@ -58,33 +42,28 @@ TOOL_SEARCH <- list(
   )
 )
 
-# ---- TOOL: get_bars_multi --------------------------------------------------
+# ============================================================================
+# TOOL: validate_symbols
+# ============================================================================
 #' @export
-TOOL_GET_BARS <- list(
+TOOL_VALIDATE_SYMBOLS <- list(
   type = "function",
   `function` = list(
-    name = "get_bars_multi",
+    name = "validate_symbols",
     description = paste(
-      "Fetch historical OHLCV bars from Alpaca for one or more US tickers.",
-      "Stores the bars in a server-side cache and returns a SUMMARY plus a",
-      "`bars_id` you can pass to compute_features in a follow-up call.",
-      "Pass multiple symbols in one call rather than calling repeatedly."
+      "Check whether a list of ticker symbols is tradable on Alpaca",
+      "(NYSE / NASDAQ / ARCA / AMEX, common stock).",
+      "Returns { valid: [...], invalid: [...] }.",
+      "ALWAYS call this before finalising your picks so you can correct any",
+      "invalid tickers (aliases, OTC names, foreign listings) before submitting."
     ),
     parameters = list(
       type = "object",
       properties = list(
         symbols = list(
           type = "array",
-          description = "Ticker symbols, e.g. ['AAPL', 'MSFT', 'NVDA']",
-          items = list(type = "string")
-        ),
-        days = list(
-          type = "integer",
-          description = "How many days of history to pull. Default 90."
-        ),
-        timeframe = list(
-          type = "string",
-          description = "Bar size, e.g. '1Day', '1Hour', '15Min'. Default '1Day'."
+          items = list(type = "string"),
+          description = "Ticker symbols to validate, e.g. ['AAPL','BRK.B']"
         )
       ),
       required = list("symbols")
@@ -92,32 +71,69 @@ TOOL_GET_BARS <- list(
   )
 )
 
-# ---- TOOL: compute_features -----------------------------------------------
+# ============================================================================
+# TOOL: get_bars_multi
+# Used as an `ask_for_args` schema — the model picks symbols/timeframe/days,
+# R does the actual fetching. There is no handler for this tool in the
+# agentic loop.
+# ============================================================================
+#' @export
+TOOL_GET_BARS_MULTI <- list(
+  type = "function",
+  `function` = list(
+    name = "get_bars_multi",
+    description = paste(
+      "Pick the right historical bar parameters for a set of tickers given",
+      "the swing-trade horizon (1 day to 1 month) and each name's character.",
+      "R will execute the actual fetch with the parameters you choose."
+    ),
+    parameters = list(
+      type = "object",
+      properties = list(
+        symbols = list(
+          type = "array",
+          items = list(type = "string"),
+          description = "Tickers to fetch, e.g. ['AAPL','MSFT','NVDA']"
+        ),
+        timeframe = list(
+          type = "string",
+          description = "Bar size: '1Day', '1Hour', '15Min', etc."
+        ),
+        days = list(
+          type = "integer",
+          description = "Days of history to pull, ending today."
+        ),
+        rationale = list(
+          type = "string",
+          description = "One short sentence on why you chose this timeframe and window for these names."
+        )
+      ),
+      required = list("symbols", "timeframe", "days", "rationale")
+    )
+  )
+)
 
+# ============================================================================
+# TOOL: compute_features
+# Also `ask_for_args` style — model picks indicator specs, R runs them
+# against the bars fetched in the previous stage. No handler.
+# ============================================================================
 #' @export
 TOOL_COMPUTE_FEATURES <- list(
   type = "function",
   `function` = list(
     name = "compute_features",
     description = paste0(
-      "Compute selected technical indicators from previously-fetched bars.\n",
-      "REQUIRES a `bars_id` returned by an earlier get_bars_multi call.\n",
-      "Returns one row per symbol with the latest indicator values; output ",
-      "column names encode the parameters you chose ",
-      "(e.g. rsi_14, macd_hist_12_26_9, bb_pct_b_20_2, ema_cross_9_21).\n\n",
-      "You may pass the SAME indicator multiple times with different ",
-      "parameters to compare (e.g. rsi period=7 AND period=21).\n\n",
-      "Each feature is an OBJECT: { \"name\": \"<feature>\", ...params }.\n\n",
+      "Pick a tailored set of technical indicators (and parameters per indicator) ",
+      "to compute on the bars previously fetched. Multi-instance same indicator ",
+      "with different params is encouraged (e.g. rsi period=7 AND period=21 for ",
+      "divergence). R will execute the computation.\n\n",
       "Available features (defaults shown — override any of them):\n",
       format_feature_menu()
     ),
     parameters = list(
       type = "object",
       properties = list(
-        bars_id = list(
-          type = "string",
-          description = "The bars_id returned by a prior get_bars_multi call."
-        ),
         features = list(
           type = "array",
           description = paste(
@@ -135,112 +151,55 @@ TOOL_COMPUTE_FEATURES <- list(
                 description = "Indicator name from the menu.",
                 enum = as.list(names(FEATURE_REGISTRY))
               ),
-              period = list(type = "integer", description = "Lookback period (rsi/atr/bbands/supertrend)"),
-              sd = list(type = "number", description = "Std-dev multiplier (bbands)"),
-              fast = list(type = "integer", description = "Fast period (macd)"),
-              slow = list(type = "integer", description = "Slow period (macd)"),
-              signal = list(type = "integer", description = "Signal smoothing period (macd)"),
-              multiplier = list(type = "number", description = "ATR multiplier (supertrend)"),
-              periods = list(
+              period     = list(type = "integer", description = "Lookback period (rsi/atr/bbands/supertrend)"),
+              sd         = list(type = "number",  description = "Std-dev multiplier (bbands)"),
+              fast       = list(type = "integer", description = "Fast period (macd)"),
+              slow       = list(type = "integer", description = "Slow period (macd)"),
+              signal     = list(type = "integer", description = "Signal smoothing period (macd)"),
+              multiplier = list(type = "number",  description = "ATR multiplier (supertrend)"),
+              periods    = list(
                 type = "array",
                 items = list(type = "integer"),
-                description = "List of EMA periods (ema). Multiple periods also yield ema_cross_<short>_<long> signals."
+                description = "List of EMA periods. Multiple periods also yield ema_cross_<short>_<long> signals."
               ),
-              window = list(type = "integer", description = "Slope window (obv_slope)")
+              window     = list(type = "integer", description = "Slope window (obv_slope)")
             ),
             required = list("name")
           )
+        ),
+        rationale = list(
+          type = "string",
+          description = "One short paragraph: why these indicators and these parameters for these names and this horizon."
         )
       ),
-      required = list("bars_id", "features")
+      required = list("features", "rationale")
     )
   )
 )
 
-#' All tool schemas bundled for ask_with_tools().
-#' @export
-TOOLS <- list(TOOL_SEARCH, TOOL_GET_BARS, TOOL_COMPUTE_FEATURES)
-
-# ---- handlers --------------------------------------------------------------
+# ============================================================================
+# Handlers — only for the agentic stage 1 (search loop with validation).
+# ============================================================================
 handle_search <- function(args) {
   language <- args$language
-  if (is.null(language) || !nzchar(language)) {
-    language <- "all"
-  }
+  if (is.null(language) || !nzchar(language)) language <- "all"
   res <- search(
-    query = args$query,
-    engines = args$engines,
+    query    = args$query,
+    engines  = args$engines,
     language = language,
-    pageno = 1
+    pageno   = 1
   )
-  if (nrow(res) > 10) {
-    res <- res[seq_len(10)]
-  }
+  if (nrow(res) > 10) res <- res[seq_len(10)]
   return(res)
 }
 
-handle_get_bars_multi <- function(args) {
+handle_validate_symbols <- function(args) {
   symbols <- unlist(args$symbols, use.names = FALSE)
-  days <- if (is.null(args$days)) 90L else as.integer(args$days)
-  timeframe <- if (is.null(args$timeframe) || !nzchar(args$timeframe)) {
-    "1Day"
-  } else {
-    args$timeframe
-  }
-  now <- lubridate$now(tzone = "UTC")
-  then <- now - lubridate$ddays(days)
-  fmt <- function(t) format(t, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
-
-  bars <- market$get_bars_multi(
-    symbols = symbols,
-    timeframe = timeframe,
-    start = fmt(then),
-    end = fmt(now),
-    feed = "iex"
-  )
-
-  bars_id <- .new_bars_id()
-  assign(bars_id, bars, envir = tools_state$bars)
-
-  # Compact summary returned to the model — not the full bars.
-  summary_per_symbol <- bars[,
-    list(
-      n_bars = .N,
-      first_date = as.character(min(timestamp)),
-      last_date = as.character(max(timestamp)),
-      last_close = close[.N]
-    ),
-    by = symbol
-  ]
-
-  return(list(
-    bars_id = bars_id,
-    timeframe = timeframe,
-    summary = summary_per_symbol
-  ))
+  validate_picks(symbols)
 }
 
-handle_compute_features <- function(args) {
-  bars_id <- args$bars_id
-  if (is.null(bars_id) || !exists(bars_id, envir = tools_state$bars)) {
-    stop(
-      "Unknown bars_id '",
-      bars_id,
-      "'. ",
-      "Call get_bars_multi first and pass its returned bars_id."
-    )
-  }
-  bars <- get(bars_id, envir = tools_state$bars)
-  # compute_features mutates and returns bars-with-indicator-columns;
-  # we hand the model back just the latest row per symbol.
-  bars_w <- compute_features(bars = bars, features = args$features)
-  return(latest_per_symbol(bars_w))
-}
-
-#' Handlers bundled for ask_with_tools(). Names must match `function$name`.
 #' @export
 TOOL_HANDLERS <- list(
-  search = handle_search,
-  get_bars_multi = handle_get_bars_multi,
-  compute_features = handle_compute_features
+  search           = handle_search,
+  validate_symbols = handle_validate_symbols
 )
