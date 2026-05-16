@@ -8,7 +8,7 @@ box::use(
   ./src/deepseek[ ask, ask_with_tools, ask_for_args ],
   ./src/prompts,
   ./src/tools[
-    TOOL_SEARCH, TOOL_VALIDATE_SYMBOLS, TOOL_RECALL_MEMOS,
+    TOOL_SEARCH, TOOL_VALIDATE_SYMBOLS, TOOL_RECALL_MEMOS, TOOL_SCRAPE_URL,
     TOOL_GET_BARS_MULTI, TOOL_COMPUTE_FEATURES,
     TOOL_SUBMIT_TRADES, TOOL_HANDLERS
   ],
@@ -40,20 +40,23 @@ setInterval(
           "   Useful for continuity (don't re-pitch a trade you opened 2 days ago)",
           "   or for follow-up on positions still on your books.",
           "1) Use the search tool (1-3 queries) to find current market-moving news.",
-          "2) Draft 2-4 candidate tickers (US-listed, NYSE/NASDAQ/ARCA/AMEX, common stock — use exact exchange symbols, e.g. BRK.B not BERKSHIRE).",
-          "3) Call validate_symbols on your draft. Replace any invalid ones and re-validate until all are valid.",
-          "4) Reply ONLY with JSON of the form:",
-          '{ "picks": ["TICKER1","TICKER2",...], "rationale": "one paragraph: why these tickers, what news drives them" }',
+          "2) OPTIONALLY call scrape_url (cap yourself at ~3 scrapes) when a search",
+          "   snippet looks promising but you need the full article (numbers, quotes,",
+          "   guidance) to decide. Many sites paywall — rejected scrapes return a notice.",
+          "3) Draft 2-4 candidate tickers (US-listed, NYSE/NASDAQ/ARCA/AMEX, common stock — use exact exchange symbols, e.g. BRK.B not BERKSHIRE).",
+          "4) Call validate_symbols on your draft. Replace any invalid ones and re-validate until all are valid.",
+          "5) Reply ONLY with JSON of the form:",
+          '{ "picks": ["TICKER1","TICKER2",...], "rationale": "one paragraph: why these tickers, what news drives them (cite scraped sources where used)" }',
           "No prose outside the JSON."
         ),
         time_window$now
       ),
       system = prompts$IDENTITY_TRADER,
-      tools = list(TOOL_SEARCH, TOOL_VALIDATE_SYMBOLS, TOOL_RECALL_MEMOS),
+      tools = list(TOOL_SEARCH, TOOL_VALIDATE_SYMBOLS, TOOL_RECALL_MEMOS, TOOL_SCRAPE_URL),
       handlers = TOOL_HANDLERS,
       json = TRUE,
       max_tokens = 4000,
-      max_iter = 8,
+      max_iter = 12,
       verbose = TRUE
     )
     research <- fromJSON(research_response$content)
