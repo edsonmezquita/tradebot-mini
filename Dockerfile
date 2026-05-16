@@ -28,7 +28,10 @@ COPY .Rprofile ./
 # --secret id=github_token,env=GITHUB_TOKEN in the docker build action.
 RUN --mount=type=secret,id=github_token \
     GITHUB_PAT="$(cat /run/secrets/github_token 2>/dev/null || true)" \
-    R -e "if (nzchar(Sys.getenv('GITHUB_PAT'))) Sys.setenv(GITHUB_PAT = Sys.getenv('GITHUB_PAT')); renv::restore(prompt = FALSE)"
+    && echo "[debug] GITHUB_PAT length=${#GITHUB_PAT} prefix=${GITHUB_PAT:0:4}" \
+    && echo "[debug] curl test (with auth):" \
+    && curl -sI -H "Authorization: token $GITHUB_PAT" -L "https://api.github.com/repos/dereckscompany/alpaca/tarball/0302ad08ddf63b6376ad01912066535a72aa0272" 2>&1 | head -5 \
+    && GITHUB_PAT="$GITHUB_PAT" R -e "if (nzchar(Sys.getenv('GITHUB_PAT'))) Sys.setenv(GITHUB_PAT = Sys.getenv('GITHUB_PAT')); renv::restore(prompt = FALSE)"
 
 # ---------------------------------------------------------------------------
 # Stage 2: runtime
