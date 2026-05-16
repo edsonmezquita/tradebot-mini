@@ -29,6 +29,6 @@ TOOL_SUBMIT_TRADES <- TOOL_SUBMIT_TRADES
 #' Handlers for tools that participate in agentic loops (search + validate).
 #' @export
 TOOL_HANDLERS <- list(
-  search           = handle_search,
+  search = handle_search,
   validate_symbols = handle_validate_symbols
 )

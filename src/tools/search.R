@@ -40,13 +40,17 @@ TOOL_SEARCH <- list(
 #' @export
 handle_search <- function(args) {
   language <- args$language
-  if (is.null(language) || !nzchar(language)) language <- "all"
+  if (is.null(language) || !nzchar(language)) {
+    language <- "all"
+  }
   res <- search(
-    query    = args$query,
-    engines  = args$engines,
+    query = args$query,
+    engines = args$engines,
     language = language,
-    pageno   = 1
+    pageno = 1
   )
-  if (nrow(res) > 10) res <- res[seq_len(10)]
+  if (nrow(res) > 10) {
+    res <- res[seq_len(10)]
+  }
   return(res)
 }

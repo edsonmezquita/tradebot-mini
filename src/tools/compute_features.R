@@ -37,18 +37,18 @@ TOOL_COMPUTE_FEATURES <- list(
                 description = "Indicator name from the menu.",
                 enum = as.list(names(FEATURE_REGISTRY))
               ),
-              period     = list(type = "integer", description = "Lookback period (rsi/atr/bbands/supertrend)"),
-              sd         = list(type = "number",  description = "Std-dev multiplier (bbands)"),
-              fast       = list(type = "integer", description = "Fast period (macd)"),
-              slow       = list(type = "integer", description = "Slow period (macd)"),
-              signal     = list(type = "integer", description = "Signal smoothing period (macd)"),
-              multiplier = list(type = "number",  description = "ATR multiplier (supertrend)"),
-              periods    = list(
+              period = list(type = "integer", description = "Lookback period (rsi/atr/bbands/supertrend)"),
+              sd = list(type = "number", description = "Std-dev multiplier (bbands)"),
+              fast = list(type = "integer", description = "Fast period (macd)"),
+              slow = list(type = "integer", description = "Slow period (macd)"),
+              signal = list(type = "integer", description = "Signal smoothing period (macd)"),
+              multiplier = list(type = "number", description = "ATR multiplier (supertrend)"),
+              periods = list(
                 type = "array",
                 items = list(type = "integer"),
                 description = "List of EMA periods. Multiple periods also yield ema_cross_<short>_<long> signals."
               ),
-              window     = list(type = "integer", description = "Slope window (obv_slope)")
+              window = list(type = "integer", description = "Slope window (obv_slope)")
             ),
             required = list("name")
           )

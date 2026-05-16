@@ -17,18 +17,24 @@ setInterval <- function(fun, interval = 60) {
 #' JSON). Numeric columns are rounded to `digits`.
 #' @export
 format_dt_md <- function(dt, digits = 4L) {
-  if (is.null(dt) || nrow(dt) == 0L) return("(empty)")
+  if (is.null(dt) || nrow(dt) == 0L) {
+    return("(empty)")
+  }
   dt <- copy(as.data.table(dt))
   for (col in names(dt)) {
     if (is.numeric(dt[[col]])) {
       dt[, (col) := round(get(col), digits)]
     }
   }
-  hdr  <- paste0("| ", paste(names(dt), collapse = " | "), " |")
-  sep  <- paste0("|", paste(rep("---", ncol(dt)), collapse = "|"), "|")
-  rows <- vapply(seq_len(nrow(dt)), function(i) {
-    paste0("| ", paste(as.character(unlist(dt[i])), collapse = " | "), " |")
-  }, character(1))
+  hdr <- paste0("| ", paste(names(dt), collapse = " | "), " |")
+  sep <- paste0("|", paste(rep("---", ncol(dt)), collapse = "|"), "|")
+  rows <- vapply(
+    seq_len(nrow(dt)),
+    function(i) {
+      paste0("| ", paste(as.character(unlist(dt[i])), collapse = " | "), " |")
+    },
+    character(1)
+  )
   paste(c(hdr, sep, rows), collapse = "\n")
 }
 

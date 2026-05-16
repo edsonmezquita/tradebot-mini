@@ -125,20 +125,31 @@ setInterval(
     print(signals)
 
     cat("\n[stage 4] decide\n")
-    acct        <- get_account_state()
-    positions   <- get_positions_with_age()
+    acct <- get_account_state()
+    positions <- get_positions_with_age()
     open_orders <- get_open_orders()
-    recent      <- bars[, tail(.SD, 10L), by = symbol]
+    recent <- bars[, tail(.SD, 10L), by = symbol]
 
-    cat(sprintf("  cash=$%.0f  equity=$%.0f  buying_power=$%.0f  positions=%d  open_orders=%d\n",
-                acct$cash, acct$equity, acct$buying_power, nrow(positions), nrow(open_orders)))
+    cat(sprintf(
+      "  cash=$%.0f  equity=$%.0f  buying_power=$%.0f  positions=%d  open_orders=%d\n",
+      acct$cash,
+      acct$equity,
+      acct$buying_power,
+      nrow(positions),
+      nrow(open_orders)
+    ))
 
     decision_args <- ask_for_args(
       prompt = paste(
         "<account_state>\n",
-        sprintf("cash=%.2f  equity=%.2f  buying_power=%.2f  daytrade_count=%d  pattern_day_trader=%s",
-                acct$cash, acct$equity, acct$buying_power,
-                acct$daytrade_count, acct$pattern_day_trader),
+        sprintf(
+          "cash=%.2f  equity=%.2f  buying_power=%.2f  daytrade_count=%d  pattern_day_trader=%s",
+          acct$cash,
+          acct$equity,
+          acct$buying_power,
+          acct$daytrade_count,
+          acct$pattern_day_trader
+        ),
         "\n</account_state>\n\n",
 
         "<positions> (current holdings; respect minimum hold periods)\n",
@@ -149,31 +160,39 @@ setInterval(
         format_dt_md(open_orders, digits = 4),
         "\n</open_orders>\n\n",
 
-        "<news_rationale>\n", research$rationale, "\n</news_rationale>\n\n",
+        "<news_rationale>\n",
+        research$rationale,
+        "\n</news_rationale>\n\n",
 
         "<recent_bars> (last 10 bars per symbol with the indicators you chose;",
         " parameter choices encoded in the column names)\n",
         format_dt_md(recent, digits = 4),
         "\n</recent_bars>\n\n",
 
-        "<indicator_rationale>\n", feat_args$rationale, "\n</indicator_rationale>\n\n",
+        "<indicator_rationale>\n",
+        feat_args$rationale,
+        "\n</indicator_rationale>\n\n",
 
         "Submit one decision per ticker via the submit_trades tool.",
         "Action 'hold' = no order. For 'buy'/'sell' include a notional dollar amount",
         "you'd risk on that single trade, sized appropriately given buying_power",
         "and the confidence you have in the setup."
       ),
-      system     = prompts$IDENTITY_TRADER,
-      tool       = TOOL_SUBMIT_TRADES,
+      system = prompts$IDENTITY_TRADER,
+      tool = TOOL_SUBMIT_TRADES,
       max_tokens = 6000
     )
     decisions <- decision_args$decisions
     cat("\n--- model decisions ---\n")
     for (d in decisions) {
-      cat(sprintf("  %s  %-4s  $%-8s  conf=%.2f  %s\n",
-                  d$ticker, d$action,
-                  if (is.null(d$notional)) "" else format(d$notional, nsmall = 2),
-                  d$confidence, d$reason))
+      cat(sprintf(
+        "  %s  %-4s  $%-8s  conf=%.2f  %s\n",
+        d$ticker,
+        d$action,
+        if (is.null(d$notional)) "" else format(d$notional, nsmall = 2),
+        d$confidence,
+        d$reason
+      ))
     }
 
     cat("\n--- comparison: programmatic vs model ---\n")
@@ -183,7 +202,8 @@ setInterval(
     print(merge(
       signals[, list(symbol, prog_signal = signal, prog_score = score)],
       decisions_dt,
-      by = "symbol", all = TRUE
+      by = "symbol",
+      all = TRUE
     ))
 
     cat("\n[stage 5] execute\n")
@@ -194,22 +214,25 @@ setInterval(
       }
       result <- tryCatch(
         trading$add_order(
-          symbol        = d$ticker,
-          side          = d$action,
-          type          = "market",
+          symbol = d$ticker,
+          side = d$action,
+          type = "market",
           time_in_force = "day",
-          notional      = d$notional
+          notional = d$notional
         ),
         error = function(e) {
-          cat(sprintf("  FAIL  %s %s $%s: %s\n",
-                      d$ticker, d$action, d$notional, conditionMessage(e)))
+          cat(sprintf("  FAIL  %s %s $%s: %s\n", d$ticker, d$action, d$notional, conditionMessage(e)))
           NULL
         }
       )
       if (!is.null(result)) {
-        cat(sprintf("  OK    %s %s $%s  (order_id=%s)\n",
-                    d$ticker, d$action, d$notional,
-                    if (is.list(result)) result$id else "?"))
+        cat(sprintf(
+          "  OK    %s %s $%s  (order_id=%s)\n",
+          d$ticker,
+          d$action,
+          d$notional,
+          if (is.list(result)) result$id else "?"
+        ))
       }
     }
 
