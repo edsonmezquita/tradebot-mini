@@ -10,7 +10,8 @@ box::use(
   ./scrape_url      [ TOOL_SCRAPE_URL,        handle_scrape_url       ],
   ./get_bars_multi  [ TOOL_GET_BARS_MULTI                             ],
   ./compute_features[ TOOL_COMPUTE_FEATURES                           ],
-  ./submit_trades   [ TOOL_SUBMIT_TRADES                              ]
+  ./submit_trades   [ TOOL_SUBMIT_TRADES                              ],
+  ./post_tweets     [ TOOL_POST_TWEETS                                ]
 )
 
 #' @export
@@ -33,6 +34,9 @@ TOOL_COMPUTE_FEATURES <- TOOL_COMPUTE_FEATURES
 
 #' @export
 TOOL_SUBMIT_TRADES <- TOOL_SUBMIT_TRADES
+
+#' @export
+TOOL_POST_TWEETS <- TOOL_POST_TWEETS
 
 #' Handlers for tools that participate in agentic loops.
 #' @export
