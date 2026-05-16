@@ -29,17 +29,16 @@ cat(sprintf("\n========== tradebot-mini  %s ==========\n",
 # Apply any pending schema migrations.
 db_migrate()
 
-# Market holiday / weekend check — query Alpaca's calendar for today.
+# Is today a US equity trading day? Used to gate stage 5 (order execution).
+# When the market is closed (weekend or holiday) the bot still runs research +
+# analysis + memo + tweet — only actual order placement is skipped.
 today_str <- format(Sys.Date(), "%Y-%m-%d")
 cal <- tryCatch(
   market$get_calendar(start = today_str, end = today_str),
   error = function(e) NULL
 )
-if (is.null(cal) || nrow(cal) == 0L) {
-  cat("[holiday] Alpaca calendar has no entry for", today_str, "— US market is closed today. Exiting.\n")
-  db_disconnect()
-  quit(save = "no", status = 0L)
-}
+is_trading_day <- !is.null(cal) && nrow(cal) > 0L
+cat(sprintf("[market] is_trading_day = %s (%s)\n", is_trading_day, today_str))
 
 # Begin a tracked cycle run.
 cycle_id <- cycle_runs_start(iteration = 0L)
@@ -210,10 +209,22 @@ cycle_result <- tryCatch({
       " parameter choices encoded in the column names)\n",
       format_dt_md(recent, digits = 4), "\n</recent_bars>\n\n",
       "<indicator_rationale>\n", feat_args$rationale, "\n</indicator_rationale>\n\n",
-      "Submit one decision per ticker via the submit_trades tool.",
-      "Action 'hold' = no order. For 'buy'/'sell' include a notional dollar amount",
-      "you'd risk on that single trade, sized appropriately given buying_power",
-      "and the confidence you have in the setup."
+      if (is_trading_day) {
+        paste(
+          "Submit one decision per ticker via the submit_trades tool.",
+          "Action 'hold' = no order. For 'buy'/'sell' include a notional dollar amount",
+          "you'd risk on that single trade, sized appropriately given buying_power",
+          "and the confidence you have in the setup."
+        )
+      } else {
+        paste(
+          "<market_status>THE US EQUITY MARKET IS CLOSED TODAY (weekend or holiday).</market_status>",
+          "Submit one decision per ticker via the submit_trades tool.",
+          "EVERY action MUST be 'hold' — no orders will be placed today regardless.",
+          "Use this cycle to analyse, note thesis updates, and prep for the next",
+          "trading day. The memo and tweet stages will still run."
+        )
+      }
     ),
     system = prompts$IDENTITY_TRADER,
     tool = TOOL_SUBMIT_TRADES,
@@ -238,23 +249,27 @@ cycle_result <- tryCatch({
   ))
 
   cat("\n[stage 5] execute\n")
-  for (d in decisions) {
-    if (d$action == "hold") {
-      cat(sprintf("  HOLD  %s\n", d$ticker)); next
-    }
-    result <- tryCatch(
-      trading$add_order(
-        symbol = d$ticker, side = d$action, type = "market",
-        time_in_force = "day", notional = d$notional
-      ),
-      error = function(e) {
-        cat(sprintf("  FAIL  %s %s $%s: %s\n", d$ticker, d$action, d$notional, conditionMessage(e))); NULL
+  if (!is_trading_day) {
+    cat("  market closed today — skipping all order placement\n")
+  } else {
+    for (d in decisions) {
+      if (d$action == "hold") {
+        cat(sprintf("  HOLD  %s\n", d$ticker)); next
       }
-    )
-    if (!is.null(result)) {
-      cat(sprintf("  OK    %s %s $%s  (order_id=%s)\n",
-                  d$ticker, d$action, d$notional,
-                  if (is.list(result)) result$id else "?"))
+      result <- tryCatch(
+        trading$add_order(
+          symbol = d$ticker, side = d$action, type = "market",
+          time_in_force = "day", notional = d$notional
+        ),
+        error = function(e) {
+          cat(sprintf("  FAIL  %s %s $%s: %s\n", d$ticker, d$action, d$notional, conditionMessage(e))); NULL
+        }
+      )
+      if (!is.null(result)) {
+        cat(sprintf("  OK    %s %s $%s  (order_id=%s)\n",
+                    d$ticker, d$action, d$notional,
+                    if (is.list(result)) result$id else "?"))
+      }
     }
   }
 
@@ -277,10 +292,17 @@ cycle_result <- tryCatch({
     cat(sprintf("  skipping — last tweet was %.1f hours ago (<20h cost discipline)\n",
                 hours_since_last))
   } else {
+    market_note <- if (is_trading_day) {
+      "Market was OPEN today — your status tweet can reference today's trades, fills, and current positions."
+    } else {
+      "Market is CLOSED today (weekend or holiday). No trades were placed. Status tweet should reflect that — analysis, commentary, what you're watching for the next trading day, reactions to weekend news. Don't pretend you traded."
+    }
     tweet_args <- ask_for_args(
       prompt = paste(
         "You are Chris de la Thune, posting your daily status update to X (@",
-        tw_state$username, ").\n\n<account_state>\n",
+        tw_state$username, ").\n\n",
+        market_note, "\n\n",
+        "<account_state>\n",
         sprintf("cash=$%.2f  equity=$%.2f  buying_power=$%.2f", acct$cash, acct$equity, acct$buying_power),
         "\n</account_state>\n\n<todays_decisions>\n",
         paste(vapply(decisions, function(d) sprintf("- %s %s %s (conf %.2f): %s",

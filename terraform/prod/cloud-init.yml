@@ -24,12 +24,12 @@ runcmd:
   - systemctl enable --now fail2ban
   - mkdir -p /opt/app/searxng /opt/app/logs
   - chmod 700 /opt/app
-  # Three cycles per US trading day, all Mon-Fri only:
-  #   10:00 ET — 30 min after open (settle from open volatility)
-  #   13:00 ET — midday (~midpoint of 9:30-16:00 session)
-  #   15:00 ET — one hour before close (final repositioning window)
-  # main.R short-circuits on US market holidays via Alpaca's calendar
-  # endpoint, so weekday filter is enough — no holiday list needed here.
+  # Weekdays: 3 cycles per US trading day at 10:00, 13:00, 15:00 ET.
+  # Weekends: 1 cycle per day at noon ET — bot runs research + tweets but
+  # does NOT trade (live equity market is closed; main.R skips stage 5).
+  # US market holidays on weekdays still fire cron, and main.R detects
+  # them via Alpaca's calendar endpoint and falls into the same
+  # no-trading-but-still-tweet path.
   - |
     cat > /etc/cron.d/tradebot <<'EOF'
     SHELL=/bin/bash
@@ -38,5 +38,6 @@ runcmd:
     0 10 * * 1-5 root cd /opt/app && /usr/bin/docker compose --env-file .env --profile manual run --rm tradebot >> /opt/app/logs/cycle-$(date +\%Y\%m\%d-\%H\%M).log 2>&1
     0 13 * * 1-5 root cd /opt/app && /usr/bin/docker compose --env-file .env --profile manual run --rm tradebot >> /opt/app/logs/cycle-$(date +\%Y\%m\%d-\%H\%M).log 2>&1
     0 15 * * 1-5 root cd /opt/app && /usr/bin/docker compose --env-file .env --profile manual run --rm tradebot >> /opt/app/logs/cycle-$(date +\%Y\%m\%d-\%H\%M).log 2>&1
+    0 12 * * 0,6 root cd /opt/app && /usr/bin/docker compose --env-file .env --profile manual run --rm tradebot >> /opt/app/logs/cycle-$(date +\%Y\%m\%d-\%H\%M).log 2>&1
     EOF
   - chmod 644 /etc/cron.d/tradebot
