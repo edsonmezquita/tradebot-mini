@@ -75,7 +75,7 @@ ask_for_args <- function(
   prompt,
   tool,
   system = NULL,
-  model = "deepseek-v4-pro",
+  model = "deepseek-v4-flash",
   temperature = 0.7,
   max_tokens = NULL,
   api_key = Sys.getenv("DEEPSEEK_KEY"),
@@ -83,11 +83,15 @@ ask_for_args <- function(
 ) {
   stopifnot(nzchar(prompt), nzchar(api_key), is.list(tool))
 
+  # Thinking-mode models on DeepSeek do not support tool_choice="required".
+  # We explicitly disable thinking; for structured output we just want the
+  # tool args, no chain-of-thought needed.
   body <- list(
     model = model,
     messages = .build_messages(prompt, system),
     tools = list(tool),
     tool_choice = "required",
+    thinking = list(type = "disabled"),
     temperature = temperature,
     max_tokens = max_tokens,
     stream = FALSE
