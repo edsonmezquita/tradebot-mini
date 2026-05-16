@@ -3,7 +3,9 @@ box::use(
     get_api_keys,
     get_base_url,
     get_data_base_url,
-    AlpacaMarketData
+    AlpacaMarketData,
+    AlpacaAccount,
+    AlpacaTrading
   ]
 )
 
@@ -16,4 +18,16 @@ market <- AlpacaMarketData$new(
   keys = KEYS,
   base_url = ALPACA_API_ENDPOINT,
   data_base_url = ALPACA_DATA_ENDPOINT
+)
+
+#' @export
+account <- AlpacaAccount$new(
+  keys = KEYS,
+  base_url = ALPACA_API_ENDPOINT
+)
+
+#' @export
+trading <- AlpacaTrading$new(
+  keys = KEYS,
+  base_url = ALPACA_API_ENDPOINT
 )

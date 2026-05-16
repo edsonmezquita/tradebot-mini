@@ -2,19 +2,20 @@ box::use(
   later,
   lubridate,
   jsonlite[ fromJSON ],
-  data.table[ as.data.table, tail ],
+  data.table[ rbindlist, tail ],
   utils[ capture.output ],
-  ./src/utils[ setInterval, get_time_window ],
+  ./src/utils[ setInterval, get_time_window, format_dt_md ],
   ./src/deepseek[ ask, ask_with_tools, ask_for_args ],
   ./src/prompts,
   ./src/tools[
     TOOL_SEARCH, TOOL_VALIDATE_SYMBOLS,
     TOOL_GET_BARS_MULTI, TOOL_COMPUTE_FEATURES,
-    TOOL_HANDLERS
+    TOOL_SUBMIT_TRADES, TOOL_HANDLERS
   ],
   ./src/features[ compute_features ],
   ./src/signals[ derive_signals ],
-  ./src/alpaca[ market ]
+  ./src/alpaca[ market, trading ],
+  ./src/portfolio[ get_account_state, get_positions_with_age, get_open_orders ]
 )
 
 iteration <- 0
@@ -124,36 +125,93 @@ setInterval(
     print(signals)
 
     cat("\n[stage 4] decide\n")
-    recent <- bars[, tail(.SD, 10L), by = symbol]
-    recent_text <- paste(capture.output(print(recent)), collapse = "\n")
+    acct        <- get_account_state()
+    positions   <- get_positions_with_age()
+    open_orders <- get_open_orders()
+    recent      <- bars[, tail(.SD, 10L), by = symbol]
 
-    decision_response <- ask(
+    cat(sprintf("  cash=$%.0f  equity=$%.0f  buying_power=$%.0f  positions=%d  open_orders=%d\n",
+                acct$cash, acct$equity, acct$buying_power, nrow(positions), nrow(open_orders)))
+
+    decision_args <- ask_for_args(
       prompt = paste(
-        "News rationale (from your earlier research):\n",
-        research$rationale,
-        "\n\nLast 10 bars per symbol with the indicators YOU chose",
-        "(parameter choices encoded in the column names):\n",
-        recent_text,
-        "\n\nYour earlier rationale for the indicator parameters:\n",
-        feat_args$rationale,
-        "\n\nReply ONLY with JSON of the form:",
-        '{ "decisions": [ { "ticker": "X", "action": "buy"|"sell"|"hold", "confidence": 0.0-1.0, "reason": "one sentence grounded in the table above" } ] }'
+        "<account_state>\n",
+        sprintf("cash=%.2f  equity=%.2f  buying_power=%.2f  daytrade_count=%d  pattern_day_trader=%s",
+                acct$cash, acct$equity, acct$buying_power,
+                acct$daytrade_count, acct$pattern_day_trader),
+        "\n</account_state>\n\n",
+
+        "<positions> (current holdings; respect minimum hold periods)\n",
+        format_dt_md(positions, digits = 4),
+        "\n</positions>\n\n",
+
+        "<open_orders> (unfilled — do NOT duplicate)\n",
+        format_dt_md(open_orders, digits = 4),
+        "\n</open_orders>\n\n",
+
+        "<news_rationale>\n", research$rationale, "\n</news_rationale>\n\n",
+
+        "<recent_bars> (last 10 bars per symbol with the indicators you chose;",
+        " parameter choices encoded in the column names)\n",
+        format_dt_md(recent, digits = 4),
+        "\n</recent_bars>\n\n",
+
+        "<indicator_rationale>\n", feat_args$rationale, "\n</indicator_rationale>\n\n",
+
+        "Submit one decision per ticker via the submit_trades tool.",
+        "Action 'hold' = no order. For 'buy'/'sell' include a notional dollar amount",
+        "you'd risk on that single trade, sized appropriately given buying_power",
+        "and the confidence you have in the setup."
       ),
-      system = prompts$IDENTITY_TRADER,
-      json = TRUE,
-      max_tokens = 4000
+      system     = prompts$IDENTITY_TRADER,
+      tool       = TOOL_SUBMIT_TRADES,
+      max_tokens = 6000
     )
-    decisions <- fromJSON(decision_response$content, simplifyDataFrame = TRUE)
+    decisions <- decision_args$decisions
     cat("\n--- model decisions ---\n")
-    print(decisions$decisions)
+    for (d in decisions) {
+      cat(sprintf("  %s  %-4s  $%-8s  conf=%.2f  %s\n",
+                  d$ticker, d$action,
+                  if (is.null(d$notional)) "" else format(d$notional, nsmall = 2),
+                  d$confidence, d$reason))
+    }
 
     cat("\n--- comparison: programmatic vs model ---\n")
+    decisions_dt <- rbindlist(lapply(decisions, function(d) {
+      list(symbol = d$ticker, model_action = d$action, model_conf = d$confidence)
+    }))
     print(merge(
       signals[, list(symbol, prog_signal = signal, prog_score = score)],
-      as.data.table(decisions$decisions)[, list(symbol = ticker, model_action = action, model_conf = confidence)],
-      by = "symbol",
-      all = TRUE
+      decisions_dt,
+      by = "symbol", all = TRUE
     ))
+
+    cat("\n[stage 5] execute\n")
+    for (d in decisions) {
+      if (d$action == "hold") {
+        cat(sprintf("  HOLD  %s\n", d$ticker))
+        next
+      }
+      result <- tryCatch(
+        trading$add_order(
+          symbol        = d$ticker,
+          side          = d$action,
+          type          = "market",
+          time_in_force = "day",
+          notional      = d$notional
+        ),
+        error = function(e) {
+          cat(sprintf("  FAIL  %s %s $%s: %s\n",
+                      d$ticker, d$action, d$notional, conditionMessage(e)))
+          NULL
+        }
+      )
+      if (!is.null(result)) {
+        cat(sprintf("  OK    %s %s $%s  (order_id=%s)\n",
+                    d$ticker, d$action, d$notional,
+                    if (is.list(result)) result$id else "?"))
+      }
+    }
 
     iteration <<- iteration + 1
     invisible(list(research = research, bars = bars, signals = signals, decisions = decisions))
