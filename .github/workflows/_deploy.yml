@@ -132,10 +132,12 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # GITHUB_TOKEN can read repos in the org GHCR is on, including
+          # RENV_GITHUB_PAT (org-level secret) has cross-repo read access to
           # the private hpfi package fetched by renv::restore at build time.
+          # The default GITHUB_TOKEN is scoped to this repo only and can't
+          # read tradebot-hpfi.
           secrets: |
-            github_token=${{ secrets.GITHUB_TOKEN }}
+            github_token=${{ secrets.RENV_GITHUB_PAT }}
 
   deploy:
     needs: [infra, build]
