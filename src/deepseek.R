@@ -57,6 +57,56 @@ extract_tool_results <- function(messages) {
   )
 }
 
+#' One-shot structured-output via tool calling.
+#'
+#' Forces the model to emit a single tool call matching `tool`'s schema, then
+#' returns the parsed arguments. There is NO agentic loop and the model
+#' NEVER sees a tool result — we're using the tool schema purely as a strict
+#' JSON shape constraint on the output. R takes the args and runs whatever
+#' it needs to.
+#'
+#' @param prompt User prompt.
+#' @param tool A single tool schema object (not a list of them).
+#' @param system Optional system prompt.
+#' @param model,temperature,max_tokens,api_key,timeout See [ask()].
+#' @return Named list of parsed arguments.
+#' @export
+ask_for_args <- function(
+  prompt,
+  tool,
+  system = NULL,
+  model = "deepseek-v4-pro",
+  temperature = 0.7,
+  max_tokens = NULL,
+  api_key = Sys.getenv("DEEPSEEK_KEY"),
+  timeout = 60
+) {
+  stopifnot(nzchar(prompt), nzchar(api_key), is.list(tool))
+
+  body <- list(
+    model       = model,
+    messages    = .build_messages(prompt, system),
+    tools       = list(tool),
+    tool_choice = "required",
+    temperature = temperature,
+    max_tokens  = max_tokens,
+    stream      = FALSE
+  )
+  body <- body[!vapply(body, is.null, logical(1))]
+
+  parsed <- .post(body, api_key, timeout)
+  msg    <- parsed$choices[[1]]$message
+  calls  <- msg$tool_calls
+
+  if (is.null(calls) || length(calls) == 0L) {
+    stop("Model did not emit a tool call. content: ",
+         substr(as.character(msg$content), 1, 200))
+  }
+  raw_args <- calls[[1]]$`function`$arguments
+  if (!nzchar(raw_args)) return(list())
+  return(jsonlite::fromJSON(raw_args, simplifyVector = FALSE))
+}
+
 #' Call the DeepSeek chat completions API.
 #'
 #' @param prompt User message (string).
