@@ -54,8 +54,11 @@ TOOL_VALIDATE_SYMBOLS <- list(
       "Check whether a list of ticker symbols is tradable on Alpaca",
       "(NYSE / NASDAQ / ARCA / AMEX, common stock).",
       "Returns { valid: [...], invalid: [...] }.",
-      "ALWAYS call this before finalising your picks so you can correct any",
-      "invalid tickers (aliases, OTC names, foreign listings) before submitting."
+      "MANDATORY: call this before finalising your picks. Failure to validate",
+      "your final list will cause the trader to skip this iteration entirely",
+      "and your rationale will be discarded. Validate, correct any invalid",
+      "tickers (aliases, OTC names, foreign listings), and re-validate until",
+      "all picks are valid before writing your JSON reply."
     ),
     parameters = list(
       type = "object",
